@@ -1,0 +1,14 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body {
+    @apply min-h-full bg-shell text-ink antialiased;
+  }
+
+  body {
+    background-image: radial-gradient(circle at 8% 8%, #ffffff 0%, #f4f6f1 52%, #e8eee7 100%);
+  }
+}

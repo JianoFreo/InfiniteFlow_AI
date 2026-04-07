@@ -1,37 +1,29 @@
-from pydantic_settings import BaseSettings
-from functools import lru_cache
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
 
 class Settings(BaseSettings):
-    # API
-    API_TITLE: str = "InfiniteFlow AI API"
-    API_VERSION: str = "0.1.0"
-    DEBUG: bool = True
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    # Database
-    DATABASE_URL: str = "postgresql://user:password@localhost:5432/infiniteflow"
-    
-    # Redis
-    REDIS_URL: str = "redis://localhost:6379"
-    
-    # Storage
-    S3_BUCKET: str = "infiniteflow-videos"
-    S3_REGION: str = "us-east-1"
-    AWS_ACCESS_KEY_ID: str = ""
-    AWS_SECRET_ACCESS_KEY: str = ""
-    
-    # Upload
-    MAX_UPLOAD_SIZE: int = 5 * 1024 * 1024 * 1024  # 5GB
-    UPLOAD_DIR: str = "/tmp/uploads"
-    OUTPUT_DIR: str = "/tmp/output"
-    
-    # Processing
-    ENABLE_GPU: bool = True
-    RIFE_MODEL_PATH: str = "./models/rife"
-    
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
+    app_name: str = "InfiniteFlow API"
+    app_env: str = "production"
+    app_debug: bool = False
+    api_prefix: str = "/api/v1"
 
-@lru_cache()
-def get_settings():
-    return Settings()
+    database_url: str = "postgresql+psycopg://app:app@db:5432/interp"
+    redis_url: str = "redis://redis:6379/0"
+    queue_name: str = "video"
+
+    file_root: str = "/data"
+    uploads_subdir: str = "uploads"
+    outputs_subdir: str = "outputs"
+
+    @property
+    def uploads_dir(self) -> str:
+        return f"{self.file_root}/{self.uploads_subdir}"
+
+    @property
+    def outputs_dir(self) -> str:
+        return f"{self.file_root}/{self.outputs_subdir}"
+
+
+settings = Settings()
