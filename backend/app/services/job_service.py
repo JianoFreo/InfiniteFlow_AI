@@ -3,6 +3,10 @@ import uuid
 from pathlib import Path
 
 from fastapi import HTTPException, UploadFile
+from redis import Redis
+from rq.command import send_stop_job_command
+from rq.exceptions import NoSuchJobError
+from rq.job import Job as RQJob
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -36,7 +40,13 @@ def create_video_job(db: Session, file: UploadFile, interpolation_factor: int = 
     db.commit()
     db.refresh(job)
 
-    video_queue.enqueue(VIDEO_PROCESS_TASK, str(job.id), job_timeout="30m", retry=retry_policy)
+    video_queue.enqueue(
+        VIDEO_PROCESS_TASK,
+        str(job.id),
+        job_timeout="30m",
+        retry=retry_policy,
+        job_id=str(job.id),
+    )
     return job
 
 
@@ -55,3 +65,27 @@ def get_downloadable_output_path(job: Job) -> Path:
     if not output_path.exists():
         raise HTTPException(status_code=404, detail="Output file missing")
     return output_path
+
+
+def cancel_video_job(db: Session, job_id: uuid.UUID) -> Job:
+    job = get_video_job(db, job_id)
+
+    if job.status in (JobStatus.completed, JobStatus.failed):
+        return job
+
+    redis_conn = Redis.from_url(settings.redis_url)
+    try:
+        rq_job = RQJob.fetch(str(job.id), connection=redis_conn)
+        rq_status = rq_job.get_status(refresh=True)
+        if rq_status in ("queued", "deferred", "scheduled"):
+            rq_job.cancel()
+        elif rq_status == "started":
+            send_stop_job_command(redis_conn, rq_job.id)
+    except (NoSuchJobError, ValueError):
+        pass
+
+    job.status = JobStatus.failed
+    job.error_message = "Cancelled by user"
+    db.commit()
+    db.refresh(job)
+    return job

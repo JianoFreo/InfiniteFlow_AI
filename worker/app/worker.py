@@ -16,6 +16,10 @@ engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 logger = logging.getLogger("video_worker")
 
 
+class JobCancelledError(Exception):
+    pass
+
+
 def _setup_logging() -> None:
     level_name = os.getenv("LOG_LEVEL", "INFO").upper()
     level = getattr(logging, level_name, logging.INFO)
@@ -87,6 +91,17 @@ def _get_job_input(job_id: str) -> tuple[Path, int]:
     return Path(row["source_path"]), int(row["interpolation_factor"])
 
 
+def _is_cancel_requested(job_id: str) -> bool:
+    with engine.connect() as conn:
+        row = conn.execute(
+            text("SELECT status, error_message FROM jobs WHERE id = CAST(:job_id AS uuid)"),
+            {"job_id": job_id},
+        ).mappings().first()
+    if row is None:
+        return False
+    return row["status"] == "failed" and str(row["error_message"] or "").startswith("Cancelled by user")
+
+
 def process_video_job(job_id: str) -> None:
     Path(OUTPUTS_DIR).mkdir(parents=True, exist_ok=True)
     Path(TMP_DIR).mkdir(parents=True, exist_ok=True)
@@ -111,11 +126,16 @@ def process_video_job(job_id: str) -> None:
     method = "linear"
 
     def on_progress(progress: int) -> None:
+        if _is_cancel_requested(job_id):
+            raise JobCancelledError("Cancelled by user")
         _update_progress(job_id, progress)
         _sync_rq_progress(job_id, progress)
 
     try:
         source_path, factor = _get_job_input(job_id)
+        if _is_cancel_requested(job_id):
+            logger.info("job_cancelled_before_start id=%s", job_id)
+            return
         if not source_path.exists():
             raise RuntimeError(f"Source file missing: {source_path}")
 
@@ -136,6 +156,11 @@ def process_video_job(job_id: str) -> None:
         _update_progress(job_id, 100)
         _sync_rq_progress(job_id, 100)
         logger.info("job_completed id=%s output=%s", job_id, final_output)
+    except JobCancelledError:
+        logger.info("job_cancelled_in_progress id=%s", job_id)
+        _update_progress(job_id, 0)
+        _sync_rq_progress(job_id, 0)
+        return
     except Exception as exc:
         logger.exception("job_failed id=%s attempt=%s error=%s", job_id, attempt, exc)
         retries_left = rq_job.retries_left if rq_job is not None else 0
