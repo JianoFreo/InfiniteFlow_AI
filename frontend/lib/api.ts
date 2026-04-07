@@ -21,6 +21,7 @@ export async function getJob(id: string) {
     id: string;
     status: string;
     interpolation_factor: number;
+    progress: number;
     error_message?: string;
     output_ready: boolean;
     output_url?: string;
