@@ -2,7 +2,7 @@ import "./globals.css";
 import type { ReactNode } from "react";
 
 export const metadata = {
-  title: "InfiniteFlow",
+  title: "InfiniteFlow AI",
   description: "Lightweight video interpolation SaaS",
 };
 

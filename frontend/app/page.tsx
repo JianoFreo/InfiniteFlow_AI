@@ -109,9 +109,9 @@ export default function HomePage() {
   return (
     <main className="mx-auto max-w-2xl px-5 py-8 sm:py-12">
       <section className="rounded-2xl border border-slate-200 bg-white/90 p-6 shadow-panel sm:p-8">
-        <h1 className="text-2xl font-bold tracking-tight text-ink sm:text-3xl">Video Interpolation</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-ink sm:text-3xl">InfiniteFlow AI</h1>
         <p className="mt-2 text-sm text-slate-600 sm:text-base">
-          Upload a source video, track progress, and download the processed result.
+          Upload a source video, run frame interpolation, and download a smoother result.
         </p>
 
         <form onSubmit={onSubmit} className="mt-6 space-y-4">
@@ -253,6 +253,7 @@ export default function HomePage() {
           </table>
         </div>
       </section>
+
     </main>
   );
 }
