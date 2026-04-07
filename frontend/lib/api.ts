@@ -65,3 +65,11 @@ export async function cancelJob(id: string) {
     output_url: normalizeOutputUrl(data.output_url),
   };
 }
+
+export async function deleteJob(id: string) {
+  const res = await fetch(`${API_BASE}/api/v1/jobs/${id}`, { method: "DELETE" });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || "Failed to delete job");
+  }
+}

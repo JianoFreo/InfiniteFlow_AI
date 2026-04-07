@@ -8,7 +8,7 @@ from app.core.config import settings
 from app.db.session import get_db
 from app.models.job import JobStatus
 from app.schemas.job import JobCreateResponse, JobOptions, JobResponse
-from app.services.job_service import cancel_video_job, create_video_job, get_downloadable_output_path, get_video_job, list_video_jobs
+from app.services.job_service import cancel_video_job, create_video_job, delete_video_job, get_downloadable_output_path, get_video_job, list_video_jobs
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
@@ -85,3 +85,9 @@ def cancel_job(job_id: uuid.UUID, db: Session = Depends(get_db)):
         output_ready=job.status == JobStatus.completed and bool(job.output_path),
         output_url=_build_download_url(job.id, job.status, job.output_path),
     )
+
+
+@router.delete("/{job_id}")
+def delete_job(job_id: uuid.UUID, db: Session = Depends(get_db)):
+    delete_video_job(db, job_id)
+    return {"ok": True}

@@ -24,4 +24,4 @@ class JobResponse(BaseModel):
 
 
 class JobOptions(BaseModel):
-    interpolation_factor: int = Field(default=2, ge=2, le=4)
+    interpolation_factor: int = Field(default=2, ge=2, le=8)

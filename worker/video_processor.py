@@ -21,8 +21,8 @@ class VideoMeta:
 
 
 def _ensure_factor(factor: int) -> None:
-    if factor not in (2, 4):
-        raise ValueError("Interpolation factor must be 2 or 4")
+    if factor < 2 or factor > 8:
+        raise ValueError("Interpolation factor must be between 2 and 8")
 
 
 def _ensure_method(method: str) -> str:
@@ -281,7 +281,7 @@ def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Video interpolation processor")
     parser.add_argument("--input", required=True, help="Input video path")
     parser.add_argument("--output", required=True, help="Output video path")
-    parser.add_argument("--factor", type=int, default=2, choices=[2, 4], help="Interpolation factor")
+    parser.add_argument("--factor", type=int, default=2, help="Interpolation factor (2-8)")
     parser.add_argument(
         "--method",
         type=str,

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
-import { cancelJob, createJob, listJobs, type JobItem } from "../lib/api";
+import { cancelJob, createJob, deleteJob, listJobs, type JobItem } from "../lib/api";
 
 function statusLabel(job: JobItem): string {
   if (job.status === "failed" && (job.error_message || "").startsWith("Cancelled by user")) return "cancelled";
@@ -28,6 +28,7 @@ export default function HomePage() {
   const [jobs, setJobs] = useState<JobItem[]>([]);
   const [queueError, setQueueError] = useState<string | null>(null);
   const [cancelingId, setCancelingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const visibleJobs = useMemo(() => jobs.slice(0, 20), [jobs]);
 
@@ -68,6 +69,19 @@ export default function HomePage() {
       setQueueError(err instanceof Error ? err.message : "Failed to cancel job");
     } finally {
       setCancelingId(null);
+    }
+  }
+
+  async function onDelete(id: string) {
+    setDeletingId(id);
+    try {
+      await deleteJob(id);
+      setJobs((prev) => prev.filter((row) => row.id !== id));
+      setQueueError(null);
+    } catch (err) {
+      setQueueError(err instanceof Error ? err.message : "Failed to delete job");
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -118,15 +132,21 @@ export default function HomePage() {
             <label htmlFor="factor" className="mb-2 block text-sm font-semibold text-slate-700">
               Interpolation factor
             </label>
-            <select
+            <input
               id="factor"
+              type="range"
+              min={2}
+              max={8}
+              step={1}
               value={factor}
               onChange={(e) => setFactor(Number(e.target.value))}
-              className="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700"
-            >
-              <option value={2}>2x</option>
-              <option value={4}>4x</option>
-            </select>
+              className="block w-full accent-moss"
+            />
+            <div className="mt-1 flex items-center justify-between text-xs text-slate-500">
+              <span>2x</span>
+              <span className="font-semibold text-slate-700">{factor}x</span>
+              <span>8x</span>
+            </div>
           </div>
 
           <button
@@ -185,6 +205,7 @@ export default function HomePage() {
                 visibleJobs.map((job) => {
                   const label = statusLabel(job);
                   const canCancel = label === "queued" || label === "processing";
+                  const canDelete = cancelingId !== job.id;
                   return (
                     <tr key={job.id}>
                       <td className="px-3 py-3">
@@ -214,6 +235,14 @@ export default function HomePage() {
                               {cancelingId === job.id ? "..." : "Cancel"}
                             </button>
                           ) : null}
+                          <button
+                            type="button"
+                            disabled={!canDelete || deletingId === job.id}
+                            onClick={() => onDelete(job.id)}
+                            className="rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {deletingId === job.id ? "..." : "Delete"}
+                          </button>
                         </div>
                       </td>
                     </tr>

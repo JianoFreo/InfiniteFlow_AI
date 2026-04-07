@@ -97,3 +97,29 @@ def cancel_video_job(db: Session, job_id: uuid.UUID) -> Job:
     db.commit()
     db.refresh(job)
     return job
+
+
+def delete_video_job(db: Session, job_id: uuid.UUID) -> None:
+    job = get_video_job(db, job_id)
+
+    redis_conn = Redis.from_url(settings.redis_url)
+    try:
+        rq_job = RQJob.fetch(str(job.id), connection=redis_conn)
+        rq_status = rq_job.get_status(refresh=True)
+        if rq_status in ("queued", "deferred", "scheduled"):
+            rq_job.cancel()
+        elif rq_status == "started":
+            send_stop_job_command(redis_conn, rq_job.id)
+    except (NoSuchJobError, ValueError):
+        pass
+
+    for file_path in (job.source_path, job.output_path):
+        if not file_path:
+            continue
+        try:
+            Path(file_path).unlink(missing_ok=True)
+        except OSError:
+            pass
+
+    db.delete(job)
+    db.commit()
