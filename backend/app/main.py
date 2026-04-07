@@ -1,47 +1,35 @@
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.core.config import get_settings
-from app.routes import health, processing, prompt
-from app.core.database import Base, engine
 
-# Create tables only if engine is available
-if engine is not None:
-    try:
-        Base.metadata.create_all(bind=engine)
-    except Exception as e:
-        print(f"Warning: Could not create database tables: {e}")
+from app.api.v1.health import router as health_router
+from app.api.v1.jobs import router as jobs_router
+from app.core.config import settings
+from app.db.base import Base
+from app.db.session import engine
 
 
-settings = get_settings()
+def create_app() -> FastAPI:
+    app = FastAPI(title=settings.app_name, debug=settings.app_debug)
 
-app = FastAPI(
-    title=settings.API_TITLE,
-    version=settings.API_VERSION,
-    debug=settings.DEBUG
-)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
-# CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # In production, specify allowed origins
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+    Path(settings.uploads_dir).mkdir(parents=True, exist_ok=True)
+    Path(settings.outputs_dir).mkdir(parents=True, exist_ok=True)
 
-# Include routers
-app.include_router(health.router)
-app.include_router(processing.router)
-app.include_router(prompt.router)
+    Base.metadata.create_all(bind=engine)
 
-@app.on_event("startup")
-async def startup_event():
-    print("Application starting up...")
+    app.include_router(health_router, prefix=settings.api_prefix)
+    app.include_router(jobs_router, prefix=settings.api_prefix)
 
-@app.on_event("shutdown")
-async def shutdown_event():
-    print("Application shutting down...")
+    return app
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+
+app = create_app()

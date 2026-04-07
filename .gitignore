@@ -1,59 +1,21 @@
-# Dependencies
-node_modules/
-*.egg-info/
-dist/
-build/
-
-# Virtual Environments
-venv/
-env/
-ENV/
-.venv
-
-# Environment Files
-.env
-.env.local
-.env.*.local
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-.DS_Store
-
-# Logs
-*.log
-logs/
-
-# Runtime
+# Python
 __pycache__/
 *.py[cod]
-*$py.class
-*.so
-.Python
-.pytest_cache/
-.coverage
-htmlcov/
+*.egg-info/
+.venv/
+.env
 
-# OS
-.DS_Store
-Thumbs.db
-
-# Next.js
+# Node
+node_modules/
 .next/
 out/
 
-# Docker
-docker-compose.override.yml
+# Runtime data
+storage/
+*.log
 
-# Models
-models/
-*.pkl
-*.pth
-
-# Temporary files
-tmp/
-temp/
-*.tmp
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
