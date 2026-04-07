@@ -10,8 +10,10 @@ COPY frontend/ .
 RUN npm run build
 
 FROM node:20-alpine AS runner
-WORKDIR /app/frontend
+WORKDIR /app
 ENV NODE_ENV=production
-COPY --from=builder /app/frontend .
+COPY --from=builder /app/frontend/.next/standalone ./
+COPY --from=builder /app/frontend/.next/static ./.next/static
+COPY --from=builder /app/frontend/public ./public
 EXPOSE 3000
-CMD ["npm", "run", "start"]
+CMD ["node", "server.js"]
