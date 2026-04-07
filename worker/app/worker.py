@@ -8,8 +8,7 @@ from rq import Connection, Queue, Worker
 from sqlalchemy import create_engine, text
 
 from app.config import DATABASE_URL, OUTPUTS_DIR, QUEUE_NAME, REDIS_URL, TMP_DIR
-from app.ffmpeg_utils import mux_audio
-from app.interpolation import interpolate_video
+from worker.video_processor import process_video
 
 
 engine = create_engine(DATABASE_URL, pool_pre_ping=True)
@@ -56,17 +55,24 @@ def process_video_job(job_id: str) -> None:
 
     source_path = Path(".")
     factor = 2
+    method = "linear"
 
     try:
         source_path, factor = _get_job_input(job_id)
         if not source_path.exists():
             raise RuntimeError(f"Source file missing: {source_path}")
 
-        silent_output = Path(TMP_DIR) / f"{job_id}_silent.mp4"
         final_output = Path(OUTPUTS_DIR) / f"{job_id}.mp4"
+        method = os.getenv("INTERPOLATION_METHOD", "linear")
 
-        interpolate_video(source_path, silent_output, factor)
-        mux_audio(source_path, silent_output, final_output)
+        process_video(
+            input_video=source_path,
+            output_video=final_output,
+            factor=factor,
+            method=method,
+            keep_temp=False,
+            temp_root=Path(TMP_DIR) / job_id,
+        )
 
         _update_job(job_id, "completed", output_path=str(final_output), error_message=None)
     except Exception as exc:
