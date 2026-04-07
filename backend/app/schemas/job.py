@@ -13,6 +13,7 @@ class JobResponse(BaseModel):
     id: UUID
     status: str
     interpolation_factor: int
+    progress: int
     error_message: str | None = None
     created_at: datetime
     output_ready: bool

@@ -10,7 +10,7 @@ from app.core.config import settings
 from app.db.session import get_db
 from app.models.job import Job, JobStatus
 from app.schemas.job import JobCreateResponse, JobOptions, JobResponse
-from app.services.queue import video_queue
+from app.services.queue import retry_policy, video_queue
 from app.tasks import VIDEO_PROCESS_TASK
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
@@ -45,11 +45,12 @@ async def create_job(
         source_path=str(upload_path),
         status=JobStatus.queued,
         interpolation_factor=opts.interpolation_factor,
+        progress=0,
     )
     db.add(job)
     db.commit()
 
-    video_queue.enqueue(VIDEO_PROCESS_TASK, str(job_id), job_timeout="30m")
+    video_queue.enqueue(VIDEO_PROCESS_TASK, str(job_id), job_timeout="30m", retry=retry_policy)
 
     return JobCreateResponse(id=job_id, status=JobStatus.queued.value)
 
@@ -64,6 +65,7 @@ def get_job(job_id: uuid.UUID, db: Session = Depends(get_db)):
         id=job.id,
         status=job.status.value,
         interpolation_factor=job.interpolation_factor,
+        progress=job.progress,
         error_message=job.error_message,
         created_at=job.created_at,
         output_ready=job.status == JobStatus.completed and bool(job.output_path),

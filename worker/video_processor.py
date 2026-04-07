@@ -4,6 +4,7 @@ import argparse
 import shutil
 import subprocess
 import tempfile
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -99,6 +100,7 @@ def generate_interpolated_frames(
     factor: int,
     method: str = "linear",
     jpeg_quality: int = 92,
+    progress_callback: Callable[[float], None] | None = None,
 ) -> int:
     _ensure_factor(factor)
     method = _ensure_method(method)
@@ -126,6 +128,9 @@ def generate_interpolated_frames(
                 in_between = _blend_linear(frame_a, frame_b, alpha)
             cv2.imwrite(str(output_frames_dir / f"frame_{out_index:08d}.jpg"), in_between, write_params)
             out_index += 1
+
+        if progress_callback is not None:
+            progress_callback((i + 1) / float(max(1, frame_count - 1)))
 
     last_frame = cv2.imread(str(source_frames_dir / f"frame_{frame_count - 1:08d}.jpg"))
     if last_frame is None:
@@ -221,6 +226,7 @@ def process_video(
     method: str = "linear",
     keep_temp: bool = False,
     temp_root: Path | None = None,
+    progress_callback: Callable[[int], None] | None = None,
 ) -> None:
     _ensure_factor(factor)
     method = _ensure_method(method)
@@ -230,14 +236,32 @@ def process_video(
     output_frames_dir = base_temp / "output_frames"
 
     try:
+        if progress_callback is not None:
+            progress_callback(5)
+
         meta = extract_frames(input_video=input_video, frames_dir=extracted_dir)
+
+        if progress_callback is not None:
+            progress_callback(20)
+
+        def on_interpolate_progress(value: float) -> None:
+            if progress_callback is None:
+                return
+            mapped = 20 + int(value * 70)
+            progress_callback(min(90, max(20, mapped)))
+
         generate_interpolated_frames(
             source_frames_dir=extracted_dir,
             output_frames_dir=output_frames_dir,
             frame_count=meta.frame_count,
             factor=factor,
             method=method,
+            progress_callback=on_interpolate_progress,
         )
+
+        if progress_callback is not None:
+            progress_callback(92)
+
         assemble_video_with_ffmpeg(
             frames_dir=output_frames_dir,
             fps=meta.fps,
@@ -245,6 +269,9 @@ def process_video(
             output_video=output_video,
             source_video_for_audio=input_video,
         )
+
+        if progress_callback is not None:
+            progress_callback(100)
     finally:
         if not keep_temp:
             shutil.rmtree(base_temp, ignore_errors=True)

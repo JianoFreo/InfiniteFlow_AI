@@ -24,6 +24,7 @@ class Job(Base):
     output_path: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[JobStatus] = mapped_column(SQLEnum(JobStatus), default=JobStatus.queued, nullable=False)
     interpolation_factor: Mapped[int] = mapped_column(Integer, default=2, nullable=False)
+    progress: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
