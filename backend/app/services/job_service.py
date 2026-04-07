@@ -57,6 +57,14 @@ def get_video_job(db: Session, job_id: uuid.UUID) -> Job:
     return job
 
 
+def list_video_jobs(db: Session, limit: int = 50, active_only: bool = False) -> list[Job]:
+    safe_limit = max(1, min(200, int(limit)))
+    query = db.query(Job)
+    if active_only:
+        query = query.filter(Job.status.in_((JobStatus.queued, JobStatus.processing)))
+    return query.order_by(Job.created_at.desc()).limit(safe_limit).all()
+
+
 def get_downloadable_output_path(job: Job) -> Path:
     if job.status != JobStatus.completed or not job.output_path:
         raise HTTPException(status_code=409, detail="Output not ready")

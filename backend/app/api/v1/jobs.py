@@ -8,7 +8,7 @@ from app.core.config import settings
 from app.db.session import get_db
 from app.models.job import JobStatus
 from app.schemas.job import JobCreateResponse, JobOptions, JobResponse
-from app.services.job_service import cancel_video_job, create_video_job, get_downloadable_output_path, get_video_job
+from app.services.job_service import cancel_video_job, create_video_job, get_downloadable_output_path, get_video_job, list_video_jobs
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
@@ -28,6 +28,24 @@ async def create_job(
     opts = JobOptions(interpolation_factor=interpolation_factor)
     job = create_video_job(db, file, opts.interpolation_factor)
     return JobCreateResponse(id=job.id, status=job.status.value)
+
+
+@router.get("", response_model=list[JobResponse])
+def get_jobs(limit: int = 50, active_only: bool = False, db: Session = Depends(get_db)):
+    jobs = list_video_jobs(db, limit=limit, active_only=active_only)
+    return [
+        JobResponse(
+            id=job.id,
+            status=job.status.value,
+            interpolation_factor=job.interpolation_factor,
+            progress=job.progress,
+            error_message=job.error_message,
+            created_at=job.created_at,
+            output_ready=job.status == JobStatus.completed and bool(job.output_path),
+            output_url=_build_download_url(job.id, job.status, job.output_path),
+        )
+        for job in jobs
+    ]
 
 
 @router.get("/{job_id}", response_model=JobResponse)
