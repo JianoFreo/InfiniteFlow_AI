@@ -8,7 +8,7 @@ from redis import Redis
 from rq import Connection, Queue, Worker, get_current_job
 from sqlalchemy import create_engine, text
 
-from app.config import DATABASE_URL, OUTPUTS_DIR, QUEUE_NAME, REDIS_URL, TMP_DIR
+from worker.app.config import DATABASE_URL, OUTPUTS_DIR, QUEUE_NAME, REDIS_URL, TMP_DIR
 from worker.video_processor import process_video
 
 

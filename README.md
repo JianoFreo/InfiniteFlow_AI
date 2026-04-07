@@ -1,4 +1,4 @@
-# InfiniteFlow AI - Lightweight Video Interpolation SaaS
+# InfiniteFlow AI - Lightweight Video Interpolation
 
 Simple, production-ready baseline with low resource usage:
 
@@ -25,8 +25,11 @@ Simple, production-ready baseline with low resource usage:
 
 ## Quick Start
 
-From `infra/`:
-
+## make sure you direct to the infra folder first before running docker engine:
+```
+cd 'infra'
+```
+### THEN:
 ```bash
 docker compose up --build
 ```
@@ -45,7 +48,7 @@ Endpoints:
 - Redis queue: `video`
 - Shared file volume mounted at: `/data`
 
-## Why This Is Lightweight
+## Why This Is Lightweight and efficient
 
 - No GPU dependency
 - No model loading or inference overhead
