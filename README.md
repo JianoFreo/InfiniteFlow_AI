@@ -1,4 +1,4 @@
-# InfiniteFlow AI - Lightweight Video Interpolation
+# InfiniteFlow AI - Lightweight Video Interpolation.
 
 Simple, production-ready baseline with low resource usage:
 
