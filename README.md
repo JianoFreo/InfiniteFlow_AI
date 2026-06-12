@@ -22,6 +22,7 @@ Simple, production-ready baseline with low resource usage:
 - Lightweight CPU-first processing (OpenCV + FFmpeg)
 
 ![alt text](image.png)
+<img width="1208" height="620" alt="image" src="https://github.com/user-attachments/assets/198c65e8-cfb6-483f-897a-cabd98f1dc0d" />
 
 ## Folder Structure
 
