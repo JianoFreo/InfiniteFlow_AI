@@ -19,3 +19,11 @@ storage/
 Thumbs.db
 .vscode/
 .idea/
+
+# Build output
+dist/
+*.tsbuildinfo
+target/
+
+# Spring secrets (DB_URL etc.)
+env.properties
