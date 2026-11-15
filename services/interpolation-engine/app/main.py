@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 import os
 
-import cv2
+import numpy as np
 
 from app import config
 from app.consumer import EngineConsumer
@@ -17,9 +17,10 @@ def main() -> None:
     )
     # pika logs every failed socket while RabbitMQ is still starting; the engine logs its own retry line
     logging.getLogger("pika").setLevel(logging.CRITICAL)
-    if config.ENGINE_THREADS > 0:
-        cv2.setNumThreads(config.ENGINE_THREADS)
-    logging.getLogger("engine").info("opencv=%s threads=%s", cv2.__version__, cv2.getNumThreads())
+    logging.getLogger("engine").info(
+        "engine=numpy-handwritten numpy=%s flow_preset=%s flow_max_side=%s",
+        np.__version__, config.FLOW_PRESET, config.FLOW_MAX_SIDE,
+    )
     EngineConsumer().run()
 
 

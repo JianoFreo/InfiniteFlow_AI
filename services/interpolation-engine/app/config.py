@@ -23,12 +23,12 @@ PROGRESS_INTERVAL = float(os.getenv("PROGRESS_INTERVAL", "0.5"))
 # Optical flow is computed on a copy scaled so its longest side is at most this many pixels,
 # then the flow is scaled back up. Motion estimation doesn't need full resolution; the warp still uses full-res pixels.
 FLOW_MAX_SIDE = int(os.getenv("FLOW_MAX_SIDE", "640"))
-# DIS preset: ultrafast | fast | medium. medium is noticeably better on fast motion and still cheap at 640 px.
+# Flow quality preset: ultrafast | fast | medium (see app/engine/flow.py PRESETS). medium = best quality.
 FLOW_PRESET = os.getenv("FLOW_PRESET", "medium")
 # Mean absolute difference (0-255) between two frames above which we treat it as a scene cut.
 SCENE_CUT_THRESHOLD = float(os.getenv("SCENE_CUT_THRESHOLD", "40"))
 
-# CPU threads ONE replica may use (OpenCV + x264). 0 = all cores.
+# CPU threads ONE replica may give ffmpeg/x264. 0 = all cores. (The NumPy math itself runs on one core.)
 # With N replicas on one machine set it to about cores / N. Otherwise the replicas fight over the
 # same cores and the whole system gets SLOWER than a single replica (measured: 2 replicas x 12 threads
 # on 12 cores ran each chunk at ~6 fps instead of ~17).
