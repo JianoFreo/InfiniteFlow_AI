@@ -1,0 +1,32 @@
+import type { ServiceJob } from "../../controllers/job/dto/shared.dto.js";
+
+/** A job as job-service would return it. */
+export const serviceJob = (overrides: Partial<ServiceJob> = {}): ServiceJob => ({
+  id: 7,
+  status: "PROCESSING",
+  mode: "flow",
+  factor: 4,
+  progress: 40,
+  errorMessage: null,
+  sourceMediaId: 3,
+  outputMediaId: null,
+  fileName: "skate.mov",
+  fps: "30000/1001",
+  fpsValue: 29.97002997,
+  outputFpsValue: 119.88011988,
+  width: 1920,
+  height: 1080,
+  frameCount: 300,
+  outputFrameCount: 1197,
+  durationMs: 10010,
+  hasAudio: true,
+  sourceSizeBytes: 1000,
+  outputSizeBytes: null,
+  totalChunks: 5,
+  completedChunks: 2,
+  createdAt: "2026-11-15T10:00:00Z",
+  updatedAt: "2026-11-15T10:00:05Z",
+  startedAt: "2026-11-15T10:00:01Z",
+  finishedAt: null,
+  ...overrides,
+});
