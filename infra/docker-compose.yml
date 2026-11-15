@@ -1,75 +1,121 @@
+# InfiniteFlow: BFF + 3 microservices
+#
+#   browser ─► frontend (nginx :8080) ─► backend / BFF (:5000)
+#                                          ├─► job-service   (Spring, :8081) ─► jobs_db
+#                                          └─► media-service (Spring, :8082) ─► media_db + /data
+#   job-service ─(RabbitMQ)─► interpolation-engine × N ─(RabbitMQ)─► job-service ─► BFF ─(SSE)─► browser
+#
+# Run from the repo root:   docker compose -f infra/docker-compose.yml up --build
+# More engine replicas:     docker compose -f infra/docker-compose.yml up -d --scale interpolation-engine=4
+
+name: infiniteflow
+
+x-db-env: &db-credentials
+  POSTGRES_USER: app
+  POSTGRES_PASSWORD: app
+
 services:
-  db:
+  postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: interp
-      POSTGRES_USER: app
-      POSTGRES_PASSWORD: app
+      <<: *db-credentials
+      POSTGRES_DB: postgres
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ./postgres/init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U app -d interp"]
+      test: ["CMD-SHELL", "pg_isready -U app -d jobs_db && pg_isready -U app -d media_db"]
       interval: 5s
       timeout: 5s
       retries: 20
 
-  redis:
-    image: redis:7-alpine
-    command: ["redis-server", "--save", "", "--appendonly", "no"]
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 20
-
-  backend:
-    build:
-      context: ..
-      dockerfile: infra/docker/backend.Dockerfile
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
     ports:
-      - "8000:8000"
+      - "15672:15672" # management UI: http://localhost:15672 (guest / guest)
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 10s
+      retries: 30
+
+  media-service:
+    build: ../services/media-service
     environment:
-      APP_ENV: production
-      APP_DEBUG: "false"
-      DATABASE_URL: postgresql+psycopg://app:app@db:5432/interp
-      REDIS_URL: redis://redis:6379/0
-      QUEUE_NAME: video
+      DB_URL: jdbc:postgresql://postgres:5432/media_db?user=app&password=app
       FILE_ROOT: /data
     volumes:
       - data:/data
     depends_on:
-      db:
+      postgres:
         condition: service_healthy
-      redis:
-        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:8082/actuator/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 40
     restart: unless-stopped
 
-  worker:
-    build:
-      context: ..
-      dockerfile: infra/docker/worker.Dockerfile
+  job-service:
+    build: ../services/job-service
     environment:
-      DATABASE_URL: postgresql+psycopg://app:app@db:5432/interp
-      REDIS_URL: redis://redis:6379/0
-      QUEUE_NAME: video
+      DB_URL: jdbc:postgresql://postgres:5432/jobs_db?user=app&password=app
+      RABBITMQ_HOST: rabbitmq
+      MEDIA_SERVICE_URL: http://media-service:8082
       FILE_ROOT: /data
+      CHUNK_SECONDS: "2"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      media-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:8081/actuator/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 40
+    restart: unless-stopped
+
+  interpolation-engine:
+    build: ../services/interpolation-engine
+    environment:
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/%2F
+      JOB_SERVICE_URL: http://job-service:8081
+      FLOW_PRESET: medium
+      FLOW_MAX_SIDE: "640"
     volumes:
       - data:/data
     depends_on:
-      db:
+      rabbitmq:
         condition: service_healthy
-      redis:
+    deploy:
+      replicas: 2
+    restart: unless-stopped
+
+  backend:
+    build: ../backend
+    environment:
+      PORT: "5000"
+      NODE_ENV: production
+      JOB_SERVICE_URL: http://job-service:8081
+      MEDIA_SERVICE_URL: http://media-service:8082
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      CORS_ORIGIN: http://localhost:8080,http://localhost:5173
+    ports:
+      - "5000:5000" # exposed so `npm run dev` in frontend/ can use it too
+    depends_on:
+      job-service:
+        condition: service_healthy
+      media-service:
         condition: service_healthy
     restart: unless-stopped
 
   frontend:
-    build:
-      context: ..
-      dockerfile: infra/docker/frontend.Dockerfile
+    build: ../frontend
     ports:
-      - "3000:3000"
-    environment:
-      NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
+      - "8080:80"
     depends_on:
       - backend
     restart: unless-stopped
