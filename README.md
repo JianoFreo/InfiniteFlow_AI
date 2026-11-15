@@ -27,9 +27,10 @@ The system still buffers work internally, because that buffer is what lets it ab
 | `backend/` | Express 5 + TypeScript | **BFF / API**: auth, rate limits, the only public API. Stateless, so it scales horizontally |
 | `services/job-service/` | Spring Boot 4 / Java 17 | Owns jobs, splits videos into chunks, tracks progress, triggers the merge |
 | `services/media-service/` | Spring Boot 4 / Java 17 + FFmpeg | Presigned upload/download URLs, probe, merge |
-| `services/interpolation-engine/` | **Python + NumPy** (FFmpeg only for decode/encode) | Hand-written optical flow, flow projection, warping, blending |
+| `services/interpolation-worker/` | Spring Boot 4 / Java 17 | Takes chunks from the buffer, runs the Python engine on each, handles retries, cancels, timeouts and progress |
+| `services/interpolation-engine/` | **Python + NumPy** (FFmpeg only for frame I/O) | **AI logic only:** hand-written optical flow, flow projection, warping, blending. No server, queue, network or database code |
 | Object storage | MinIO locally, S3-compatible in production | Uploads, chunk outputs and final videos |
-| Internal buffer | RabbitMQ (hidden from users) | Smooths spikes; engines pull work at their own pace |
+| Internal buffer | RabbitMQ (hidden from users) | Smooths spikes; workers pull work at their own pace |
 | Databases | PostgreSQL 16 (`jobs_db`, `media_db`) | One database per service |
 | Cache / pub-sub | Redis | Rate limits, hot job progress, SSE fan-out across BFF replicas |
 
@@ -52,10 +53,10 @@ flowchart LR
         media["media-service"]
     end
 
-    subgraph workers["Interpolation engines (autoscaled on backlog)"]
-        e1["engine #1<br/>Python + NumPy"]
-        e2["engine #2"]
-        eN["engine #N"]
+    subgraph workers["Interpolation workers (autoscaled on backlog)"]
+        e1["Java worker #1<br/>└ python engine (per chunk)"]
+        e2["Java worker #2"]
+        eN["Java worker #N"]
     end
 
     s3[("Object storage<br/>MinIO / S3")]
@@ -88,7 +89,7 @@ flowchart LR
 
 - **Video bytes never pass through our APIs.** The browser uploads straight to object storage with a presigned URL, and downloads come from the CDN. The BFF only handles small JSON requests.
 - **Every tier is stateless and scales horizontally.** BFF, job-service and media-service sit behind load balancers and autoscale on CPU and request rate.
-- **Engines scale on backlog.** They autoscale (for example with KEDA) on the internal buffer's depth, so a traffic spike makes jobs wait a bit longer instead of crashing anything.
+- **Workers scale on backlog.** They autoscale (for example with KEDA) on the internal buffer's depth, so a traffic spike makes jobs wait a bit longer instead of crashing anything.
 - **Database per service**, with read replicas for the job list and status reads. Job progress is cached in Redis so polling doesn't hit Postgres.
 - **Back-pressure:** per-user rate limits and quotas at the BFF (Redis), plus maximum file size and duration checks before any work is queued.
 - **SSE works across replicas:** whichever BFF replica a browser connects to receives every job event through Redis pub/sub.
@@ -104,7 +105,7 @@ sequenceDiagram
     participant S as Object storage
     participant J as job-service
     participant Q as Internal buffer
-    participant E as Engine x N
+    participant E as Java worker x N
     participant R as Redis
 
     U->>B: POST /api/uploads {fileName, size}
@@ -123,10 +124,11 @@ sequenceDiagram
 
     U->>B: GET /api/jobs/{id}/events (SSE)
 
-    par engines pull chunks in parallel
+    par workers pull chunks in parallel
         Q->>E: chunk task
-        E->>S: read frame range
-        E->>E: NumPy optical flow, warp, blend
+        E->>E: start python -m app.run_chunk (task on stdin)
+        E->>S: Python reads frame range
+        E->>E: Python: NumPy optical flow, warp, blend
         E->>S: write chunk video
         E->>Q: progress / done
     end
@@ -143,6 +145,36 @@ sequenceDiagram
     B-->>U: SSE: done + signed download URL
     U->>S: GET result (via CDN)
 ```
+
+## Java ↔ Python Boundary
+
+Python does the AI math and nothing else. The Java `interpolation-worker` owns everything a server does: RabbitMQ, acks and retries, cancellation, timeouts, progress reporting and calls to job-service. It runs the Python engine as a child process, once per chunk:
+
+```mermaid
+sequenceDiagram
+    participant Q as RabbitMQ
+    participant W as interpolation-worker (Java)
+    participant P as python -m app.run_chunk
+    participant J as job-service
+
+    Q->>W: chunk task (interp.chunks, prefetch 1)
+    W->>J: GET /jobs/{id} (still active?)
+    W->>P: start process, task JSON on stdin
+    loop every frame pair
+        P-->>W: {"event":"progress","framesDone":n} (stdout)
+        W->>Q: PROGRESS, throttled (interp.progress)
+    end
+    P-->>W: {"event":"done", "outputPath": ...}
+    W->>Q: DONE (persistent)
+    W->>Q: ack chunk (only after DONE is out)
+    Note over W,P: cancel → SIGTERM (Python deletes its partial file),<br/>SIGKILL after a grace period; timeout → kill → retry once → dead-letter
+```
+
+| Python exit code | Meaning | What Java does |
+| --- | --- | --- |
+| `0` + `done` | Chunk written | Publish DONE, ack |
+| `3` + `cancelled` | Stopped by SIGTERM | Ack (job was cancelled) |
+| `1` / `2` + `error`, or crash | Processing error / bad task | Retry once, then publish FAILED and dead-letter |
 
 ## The Interpolation Engine (hand-written)
 
@@ -188,7 +220,7 @@ Quality presets (`FLOW_PRESET`): `medium` (default, best), `fast`, `ultrafast`.
 | 1280×720 | ~1.1 | ~0.7 |
 | 1920×1080 | ~1.0 | ~0.5 |
 
-Pure NumPy is roughly 10× slower than OpenCV's C++. We make up for it the microservice way: a video is split into chunks that run in parallel on as many engine replicas as needed, and engines autoscale on backlog.
+Pure NumPy is roughly 10× slower than OpenCV's C++. We make up for it the microservice way: a video is split into chunks that run in parallel on as many worker replicas as needed, and workers autoscale on backlog.
 
 Chunks overlap by one frame so their boundaries are seamless: concatenating every chunk gives exactly `(N − 1) × factor + 1` frames.
 
@@ -227,7 +259,7 @@ Internally job-service still tracks per-chunk state for retries and crash recove
 
 ## Reliability
 
-- An engine acknowledges a chunk only **after** writing its output. If an engine dies, the chunk is redelivered to another one.
+- A worker acknowledges a chunk only **after** its output is written and DONE is published. If a worker dies, the chunk is redelivered to another one.
 - A failing chunk is retried once, then sent to a dead-letter queue and the job fails cleanly.
 - Every step can safely run twice: chunk outputs have fixed names, and duplicate progress messages are ignored.
 - Object storage lifecycle rules delete chunk scratch files after 1 day and expired results after N days.
@@ -236,7 +268,7 @@ Internally job-service still tracks per-chunk state for retries and crash recove
 
 ```bash
 docker compose -f infra/docker-compose.yml up --build
-docker compose -f infra/docker-compose.yml up -d --scale interpolation-engine=4   # more engines
+docker compose -f infra/docker-compose.yml up -d --scale interpolation-worker=4   # more workers
 ```
 
 | URL | What |
@@ -246,7 +278,7 @@ docker compose -f infra/docker-compose.yml up -d --scale interpolation-engine=4 
 | http://localhost:9001 | MinIO console |
 | http://localhost:15672 | RabbitMQ console (internal buffer) |
 
-Run the engine on its own, with no services:
+Run the Python engine on its own, with no services (handy for tuning the algorithm):
 
 ```bash
 cd services/interpolation-engine
@@ -257,9 +289,9 @@ python -m app.cli input.mp4 output.mp4 --factor 4
 
 From the current code to this MVP, in order:
 
-1. ~~**Engine: replace OpenCV with hand-written NumPy.**~~ **Done.** `app/engine/` holds the math, `cv2` is gone from the code and the image, and `tests/test_engine.py` checks it against known ground-truth motion.
+1. ~~**Engine: replace OpenCV with hand-written NumPy.**~~ **Done.** Python is limited to AI logic; the Java `interpolation-worker` runs it. `app/engine/` holds the math, `cv2` is gone from the code and the image, and `tests/test_engine.py` checks it against known ground-truth motion.
 2. **Frontend: simplify.** Remove the Queue page and the chunk grid. The pages become Upload → Job (progress, preview, download) → My videos.
-3. **Storage: move from the shared `/data` volume to object storage.** Add MinIO to compose. media-service issues presigned URLs, and engines read and write through the S3 API.
+3. **Storage: move from the shared `/data` volume to object storage.** Add MinIO to compose. media-service issues presigned URLs, and workers read and write through the S3 API.
 4. **BFF: scale-ready.** Presigned upload flow, Redis-backed rate limiting, SSE fan-out through Redis pub/sub, and per-job SSE instead of an all-jobs stream.
 5. **Hide the buffer.** Keep RabbitMQ internal. Drop the `job.events` → BFF path in favour of Redis, and stop exposing chunk details in the public API.
-6. **Production deploy (after the MVP):** Kubernetes with an HPA on the BFF and services, KEDA scaling engines on queue depth, managed Postgres with read replicas, S3 + CDN, and user auth and quotas.
+6. **Production deploy (after the MVP):** Kubernetes with an HPA on the BFF and services, KEDA scaling workers on queue depth, managed Postgres with read replicas, S3 + CDN, and user auth and quotas.

@@ -6,11 +6,11 @@ import org.springframework.context.annotation.Configuration;
 
 /**
  * Every queue and exchange the system uses. Spring declares them on startup.
- * The Python engine declares the same ones with the SAME arguments; RabbitMQ refuses a re-declare with different arguments.
+ * The interpolation-worker declares the same ones with the SAME arguments; RabbitMQ refuses a re-declare with different arguments.
  *
- *  job-service ──(interp.chunks queue)──────► engine      one message per chunk, work-queue style
- *  engine      ──(interp.progress queue)────► job-service progress / done / failed
- *  job-service ──(interp.cancel fanout)─────► every engine replica
+ *  job-service ──(interp.chunks queue)──────► worker      one message per chunk, work-queue style
+ *  worker      ──(interp.progress queue)────► job-service progress / done / failed
+ *  job-service ──(interp.cancel fanout)─────► every worker replica
  *  job-service ──(job.events fanout)────────► BFF → browsers over SSE
  */
 @Configuration

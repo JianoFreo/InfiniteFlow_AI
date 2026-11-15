@@ -5,7 +5,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * One unit of work for the interpolation-engine (sent on interp.chunks).
+ * One unit of work for the interpolation-worker (sent on interp.chunks), which hands it to the Python engine.
  * The engine decodes frames [startFrame, startFrame + frameCount] from sourcePath. The extra +1 frame
  * is the next chunk's first frame, needed to generate the in-betweens across the boundary (skipped when last=true).
  */

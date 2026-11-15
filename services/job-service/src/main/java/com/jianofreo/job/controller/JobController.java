@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-/** Internal API. Called by the BFF, and by the engine to check that a job is still active before starting a chunk. */
+/** Internal API. Called by the BFF, and by the interpolation-worker to check that a job is still active before starting a chunk. */
 @RestController
 @RequestMapping("jobs")
 @RequiredArgsConstructor
