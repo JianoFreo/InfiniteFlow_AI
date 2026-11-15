@@ -42,6 +42,10 @@ def main() -> None:
     parser.add_argument("--chunk-frames", type=int, default=0, help="0 = whole video as one chunk")
     args = parser.parse_args()
 
+    if config.ENGINE_THREADS > 0:
+        import cv2
+        cv2.setNumThreads(config.ENGINE_THREADS)
+
     info = probe(args.input)
     total = info["frames"]
     size = args.chunk_frames or total
@@ -56,7 +60,8 @@ def main() -> None:
         task = ChunkTask(0, index, os.path.abspath(args.input), start, min(size, total - start), last,
                          args.factor, args.mode, info["fps"], info["width"], info["height"],
                          os.path.join(workdir, f"chunk_{index:05d}.mp4"))
-        result = process_chunk(task, interpolator, x264_preset=config.X264_PRESET, x264_crf=config.X264_CRF)
+        result = process_chunk(task, interpolator, x264_preset=config.X264_PRESET, x264_crf=config.X264_CRF,
+                               threads=config.ENGINE_THREADS)
         written += result.frames_written
         if result.output_path:
             chunk_paths.append(result.output_path)

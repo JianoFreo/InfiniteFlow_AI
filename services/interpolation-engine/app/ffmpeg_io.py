@@ -35,7 +35,8 @@ def _read_text(handle) -> str:
 class FrameReader:
     """Decodes `count` frames starting at frame `start_frame` as BGR arrays of shape (height, width, 3)."""
 
-    def __init__(self, path: str, start_frame: int, count: int, fps: Fraction, width: int, height: int) -> None:
+    def __init__(self, path: str, start_frame: int, count: int, fps: Fraction, width: int, height: int,
+                 threads: int = 0) -> None:
         self.width, self.height = width, height
         self.frame_bytes = width * height * 3
         self.frames_read = 0
@@ -44,6 +45,8 @@ class FrameReader:
             # -ss before -i = fast keyframe seek, then ffmpeg decodes up to the exact time (accurate seek).
             seek = (start_frame - _SEEK_EPSILON_FRAMES) / fps
             args += ["-ss", f"{float(seek):.6f}"]
+        if threads > 0:
+            args += ["-threads", str(threads)]  # before -i = decoder threads
         args += [
             "-i", path,
             "-map", "0:v:0",
@@ -100,7 +103,7 @@ class FrameWriter:
     """Encodes BGR frames to an H.264 MP4. Writes to `<path>.part` and renames on success,
     so a half-written chunk is never mistaken for a finished one."""
 
-    def __init__(self, path: str, width: int, height: int, fps: Fraction, preset: str, crf: int) -> None:
+    def __init__(self, path: str, width: int, height: int, fps: Fraction, preset: str, crf: int, threads: int = 0) -> None:
         self.path = path
         self.tmp_path = path + ".part"
         self.frames_written = 0
@@ -112,6 +115,7 @@ class FrameWriter:
             # yuv420p needs even width/height; pad odd sizes by one pixel.
             "-vf", "pad=ceil(iw/2)*2:ceil(ih/2)*2",
             "-c:v", "libx264", "-preset", preset, "-crf", str(crf), "-pix_fmt", "yuv420p",
+            *(["-threads", str(threads)] if threads > 0 else []),
             "-an", "-f", "mp4", self.tmp_path,
         ]
         self._stderr = tempfile.TemporaryFile()

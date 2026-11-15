@@ -24,7 +24,9 @@ services:
       - pgdata:/var/lib/postgresql/data
       - ./postgres/init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U app -d jobs_db && pg_isready -U app -d media_db"]
+      # -h 127.0.0.1: check over TCP. During first-time init Postgres runs a socket-only temp server
+      # that would pass a socket check before the real server is up.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U app -d jobs_db && pg_isready -h 127.0.0.1 -U app -d media_db"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -34,7 +36,8 @@ services:
     ports:
       - "15672:15672" # management UI: http://localhost:15672 (guest / guest)
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      # check_port_connectivity waits until the AMQP port accepts connections (ping passes earlier)
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity"]
       interval: 5s
       timeout: 10s
       retries: 30
@@ -85,13 +88,15 @@ services:
       JOB_SERVICE_URL: http://job-service:8081
       FLOW_PRESET: medium
       FLOW_MAX_SIDE: "640"
+      # CPU threads per replica. Rule of thumb: CPU cores / replicas (0 = all cores). 4 x 3 measured best on 12 cores.
+      ENGINE_THREADS: ${ENGINE_THREADS:-3}
     volumes:
       - data:/data
     depends_on:
       rabbitmq:
         condition: service_healthy
     deploy:
-      replicas: 2
+      replicas: ${ENGINE_REPLICAS:-4}
     restart: unless-stopped
 
   backend:

@@ -232,6 +232,7 @@ class EngineConsumer:
                 should_stop=lambda: task.job_id in self.cancelled,
                 x264_preset=config.X264_PRESET,
                 x264_crf=config.X264_CRF,
+                threads=config.ENGINE_THREADS,
             )
         except Cancelled:
             log.info("chunk_cancelled job=%s chunk=%s", task.job_id, task.chunk_index)

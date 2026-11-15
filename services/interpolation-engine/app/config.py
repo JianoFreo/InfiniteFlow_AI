@@ -28,6 +28,12 @@ FLOW_PRESET = os.getenv("FLOW_PRESET", "medium")
 # Mean absolute difference (0-255) between two frames above which we treat it as a scene cut.
 SCENE_CUT_THRESHOLD = float(os.getenv("SCENE_CUT_THRESHOLD", "40"))
 
+# CPU threads ONE replica may use (OpenCV + x264). 0 = all cores.
+# With N replicas on one machine set it to about cores / N. Otherwise the replicas fight over the
+# same cores and the whole system gets SLOWER than a single replica (measured: 2 replicas x 12 threads
+# on 12 cores ran each chunk at ~6 fps instead of ~17).
+ENGINE_THREADS = int(os.getenv("ENGINE_THREADS", "0"))
+
 # Encoder settings for each processed chunk. All chunks of a job MUST use the same settings,
 # because media-service joins them without re-encoding.
 X264_PRESET = os.getenv("X264_PRESET", "veryfast")

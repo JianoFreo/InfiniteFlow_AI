@@ -260,10 +260,12 @@ From the project root:
 docker compose -f infra/docker-compose.yml up --build
 ```
 
-Run more engine replicas to process more chunks in parallel:
+Engine replicas and threads per replica are set together. Keep `replicas × threads ≈ CPU cores`
+(default `4 × 3`, tuned for Docker with 12 CPUs). Otherwise replicas fight over the same cores and
+the system gets slower, not faster:
 
 ```bash
-docker compose -f infra/docker-compose.yml up -d --scale interpolation-engine=4
+ENGINE_REPLICAS=2 ENGINE_THREADS=6 docker compose -f infra/docker-compose.yml up -d
 ```
 
 | URL | What |
@@ -294,6 +296,8 @@ npm run dev   # http://localhost:5173
 | engine | `SCENE_CUT_THRESHOLD` | `40` | Mean frame difference treated as a cut |
 | engine | `X264_PRESET` / `X264_CRF` | `veryfast` / `18` | Chunk encoder settings (must match across chunks) |
 | engine | `PROGRESS_INTERVAL` | `0.5` | Seconds between progress reports |
+| engine (compose) | `ENGINE_REPLICAS` | `4` | Number of engine containers |
+| engine | `ENGINE_THREADS` | `3` | CPU threads per replica for OpenCV, decoder and x264 (`0` = all cores) |
 | BFF | `CORS_ORIGIN` | `http://localhost:8080,http://localhost:5173` | Allowed origins |
 
 Postgres runs one instance with two databases, `jobs_db` and `media_db` (user `app` / password `app`), created by `infra/postgres/init-databases.sql`.
@@ -301,7 +305,18 @@ Postgres runs one instance with two databases, `jobs_db` and `media_db` (user `a
 ## Why It's Fast and Lightweight
 
 - **CPU only:** no GPU, no model weights, no inference runtime.
-- **Parallel by chunk:** throughput scales roughly with the number of engine replicas.
+- **Parallel by chunk:** throughput scales with the number of engine replicas, as long as each replica gets its own share of CPU threads.
+
+Measured end to end through the BFF (20 s 720p clip at 4×, 12 CPUs, upload + merge included, output always exactly 2397 frames):
+
+| Engine replicas × threads | Total time |
+| --- | --- |
+| 1 × 12 | 52.7 s |
+| 2 × 12 (oversubscribed) | 42.2 s |
+| 2 × 6 | 34.6 s |
+| 4 × 3 | 27.6 s |
+
+The original single-worker pipeline took 204 s for a 10 s clip in `optical_flow` mode. The new engine does the same clip in 17.8 s in a single process.
 - **Flow on a small copy:** motion is estimated at ≤640 px and scaled up; the warp still uses full-resolution pixels.
 - **Streaming everywhere:** uploads stream nginx → BFF → media-service; frames stream through ffmpeg pipes; downloads stream with Range support.
 - **No re-encode on merge:** chunks are joined with ffmpeg's concat demuxer.

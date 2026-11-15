@@ -119,16 +119,17 @@ def process_chunk(
     should_stop: Callable[[], bool] | None = None,
     x264_preset: str = "veryfast",
     x264_crf: int = 18,
+    threads: int = 0,
 ) -> ChunkResult:
     fps = Fraction(task.fps)
     frames_needed = task.frame_count + (0 if task.last else 1)
-    reader = FrameReader(task.source_path, task.start_frame, frames_needed, fps, task.width, task.height)
+    reader = FrameReader(task.source_path, task.start_frame, frames_needed, fps, task.width, task.height, threads)
     writer: FrameWriter | None = None
 
     def emit(frame: np.ndarray) -> None:
         nonlocal writer
         if writer is None:
-            writer = FrameWriter(task.output_path, task.width, task.height, fps * task.factor, x264_preset, x264_crf)
+            writer = FrameWriter(task.output_path, task.width, task.height, fps * task.factor, x264_preset, x264_crf, threads)
         writer.write(frame)
 
     try:
