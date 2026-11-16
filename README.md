@@ -161,13 +161,14 @@ sequenceDiagram
     W->>J: GET /jobs/{id} (still active?)
     W->>P: start process, task JSON on stdin
     loop every frame pair
-        P-->>W: {"event":"progress","framesDone":n} (stdout)
+        P-->>W: stdout line: event progress, framesDone n
         W->>Q: PROGRESS, throttled (interp.progress)
     end
-    P-->>W: {"event":"done", "outputPath": ...}
+    P-->>W: stdout line: event done, outputPath
     W->>Q: DONE (persistent)
     W->>Q: ack chunk (only after DONE is out)
-    Note over W,P: cancel → SIGTERM (Python deletes its partial file),<br/>SIGKILL after a grace period; timeout → kill → retry once → dead-letter
+    Note over W,P: Cancel: SIGTERM, Python deletes its partial file, SIGKILL after a grace period
+    Note over W,P: Timeout or crash: retry once, then dead-letter
 ```
 
 | Python exit code | Meaning | What Java does |
