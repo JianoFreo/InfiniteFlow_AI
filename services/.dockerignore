@@ -1,0 +1,6 @@
+# Build context for images built from services/ (interpolation-worker)
+**/target
+**/__pycache__
+**/.pytest_cache
+**/.venv
+**/*.pyc

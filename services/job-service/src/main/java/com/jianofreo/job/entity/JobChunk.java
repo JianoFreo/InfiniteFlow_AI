@@ -31,7 +31,7 @@ public class JobChunk {
     private ChunkStatus status;
 
     private String outputPath;
-    /** Hostname of the engine replica that processed it, handy for seeing the parallelism in the UI. */
+    /** Hostname of the worker replica that processed it, handy for seeing the parallelism in the UI. */
     private String worker;
 
     private Instant startedAt;

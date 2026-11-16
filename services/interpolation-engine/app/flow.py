@@ -1,31 +1,32 @@
 """Frame interpolators: given frames A and B, produce the (factor - 1) frames in between.
 
-FlowInterpolator is the default. For each pair it computes optical flow ONCE in each direction
-(A→B and B→A) with OpenCV's DIS algorithm, then builds every in-between frame from those two flows.
-The old worker recomputed Farneback flow for every in-between frame, so at 8x it did 7x the work.
+This module is the interface the pipeline uses. The math lives in app/engine/ and is all hand-written
+NumPy (no OpenCV, no learned models):
 
-Approximating the flow from the unknown middle frame back to A and B (the "linear" approximation
-from the Super SloMo paper, Jiang et al. 2018):
+    1. grayscale + Gaussian pyramid of both frames           engine/image.py, engine/pyramid.py
+    2. scene-cut check on a small copy                        engine/image.py
+    3. block matching + coarse-to-fine Lucas-Kanade flow      engine/flow.py
+       A→B and B→A (solved on a copy whose longest side is <= max_side)
+    4. occlusion masks from forward-backward consistency      engine/occlusion.py
+    5. for each t: project the flow to time t (splatting)     engine/project.py
+    6. upscale to full resolution                             engine/warp.py
+    7. warp both frames to t and blend, occlusion-aware       engine/interpolate.py
 
-    F_t→0 = -(1-t)·t·F_0→1 + t²·F_1→0
-    F_t→1 = (1-t)²·F_0→1 - t·(1-t)·F_1→0
-    I_t   = (1-t)·warp(I_0, F_t→0) + t·warp(I_1, F_t→1)
-
-Warping both frames toward time t and blending them means an object is drawn once, at its
-in-between position, instead of the two half-transparent copies a plain cross-fade gives.
+Flow is computed ONCE per direction per pair; every in-between frame reuses it.
 """
 from __future__ import annotations
 
 from typing import Protocol
 
-import cv2
 import numpy as np
 
-_DIS_PRESETS = {
-    "ultrafast": cv2.DISOPTICAL_FLOW_PRESET_ULTRAFAST,
-    "fast": cv2.DISOPTICAL_FLOW_PRESET_FAST,
-    "medium": cv2.DISOPTICAL_FLOW_PRESET_MEDIUM,
-}
+from app.engine.flow import PRESETS, estimate_flow
+from app.engine.image import mean_abs_diff, to_gray, to_uint8
+from app.engine.interpolate import planes, synthesize
+from app.engine.occlusion import occlusion_mask
+from app.engine.project import global_motion, photometric_error, project_flow, splat_key
+from app.engine.pyramid import build_pyramid
+from app.engine.warp import upscale, upscale_flow
 
 
 class Interpolator(Protocol):
@@ -41,66 +42,68 @@ class BlendInterpolator:
     """Plain cross-fade. Fastest, but moving objects ghost. Kept as the 'blend' mode."""
 
     def between(self, a: np.ndarray, b: np.ndarray, factor: int) -> list[np.ndarray]:
-        return [cv2.addWeighted(a, 1.0 - t, b, t, 0.0) for t in _timesteps(factor)]
+        fa, fb = a.astype(np.float32), b.astype(np.float32)
+        return [to_uint8(fa * (1.0 - t) + fb * t) for t in _timesteps(factor)]
 
 
 class FlowInterpolator:
-    """Bidirectional optical-flow interpolation. One instance per thread (DIS objects are not thread-safe)."""
+    """Bidirectional optical-flow interpolation. Not thread-safe: use one instance per worker thread."""
 
     def __init__(self, max_side: int = 640, preset: str = "medium", scene_cut_threshold: float = 40.0) -> None:
         self.max_side = max_side
         self.scene_cut_threshold = scene_cut_threshold
-        self._dis = cv2.DISOpticalFlow_create(_DIS_PRESETS.get(preset, cv2.DISOPTICAL_FLOW_PRESET_MEDIUM))
-        self._grid: np.ndarray | None = None
-        self._grid_shape: tuple[int, int] | None = None
+        self.settings = PRESETS.get(preset, PRESETS["medium"])
+        # Frame B of one pair is frame A of the next: keep its pyramid instead of rebuilding it.
+        self._cached_frame: np.ndarray | None = None
+        self._cached_pyramid: list[np.ndarray] | None = None
 
     def between(self, a: np.ndarray, b: np.ndarray, factor: int) -> list[np.ndarray]:
         h, w = a.shape[:2]
-        small_a, small_b = self._small_gray(a), self._small_gray(b)
+        pyr_a, pyr_b = self._pyramid(a), self._pyramid(b)
+        level = self._flow_level(pyr_a)
 
         # Scene cut: no motion connects these frames, so warping would invent garbage.
         # Repeat the nearest real frame instead.
-        if float(cv2.absdiff(small_a, small_b).mean()) > self.scene_cut_threshold:
+        if mean_abs_diff(pyr_a[level], pyr_b[level]) > self.scene_cut_threshold:
             return [a if t < 0.5 else b for t in _timesteps(factor)]
 
-        f01 = self._full_res_flow(self._dis.calc(small_a, small_b, None), w, h)
-        f10 = self._full_res_flow(self._dis.calc(small_b, small_a, None), w, h)
-        grid = self._identity_grid(h, w)
+        small_a, small_b = pyr_a[level], pyr_b[level]
+        f01 = estimate_flow(pyr_a, pyr_b, self.settings, level)
+        f10 = estimate_flow(pyr_b, pyr_a, self.settings, level)
+        occ_a = occlusion_mask(f01, f10)
+        occ_b = occlusion_mask(f10, f01)
 
+        # Everything that doesn't depend on t is computed once per pair, at flow resolution.
+        background = global_motion(f01)
+        key_a = splat_key(photometric_error(small_a, small_b, f01), occ_a, f01, background)
+        key_b = splat_key(photometric_error(small_b, small_a, f10), occ_b, -f10, background)
+
+        scale = 2 ** level
+        occ_a_full = upscale(occ_a, h, w, scale)
+        occ_b_full = upscale(occ_b, h, w, scale)
+
+        planes_a, planes_b = planes(a), planes(b)
         frames = []
         for t in _timesteps(factor):
-            ft0 = cv2.addWeighted(f01, -(1.0 - t) * t, f10, t * t, 0.0)
-            ft1 = cv2.addWeighted(f01, (1.0 - t) * (1.0 - t), f10, -t * (1.0 - t), 0.0)
-            # remap(src, map) samples src at map(x): map = x + F_t→0(x) pulls pixels of A to time t.
-            warped_a = cv2.remap(a, cv2.add(grid, ft0), None, cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
-            warped_b = cv2.remap(b, cv2.add(grid, ft1), None, cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
-            frames.append(cv2.addWeighted(warped_a, 1.0 - t, warped_b, t, 0.0))
+            u_t = upscale_flow(project_flow(f01, f10, key_a, key_b, background, t), h, w, scale)
+            ft0 = u_t * np.float32(-t)
+            ft1 = u_t * np.float32(1.0 - t)
+            frames.append(synthesize(planes_a, planes_b, ft0, ft1, occ_a_full, occ_b_full, t))
         return frames
 
-    def _small_gray(self, frame: np.ndarray) -> np.ndarray:
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        h, w = gray.shape
-        scale = self.max_side / max(h, w)
-        if scale >= 1.0:
-            return gray
-        return cv2.resize(gray, (max(8, round(w * scale)), max(8, round(h * scale))), interpolation=cv2.INTER_AREA)
+    def _pyramid(self, frame: np.ndarray) -> list[np.ndarray]:
+        if frame is self._cached_frame and self._cached_pyramid is not None:
+            return self._cached_pyramid
+        pyramid = build_pyramid(to_gray(frame))
+        self._cached_frame, self._cached_pyramid = frame, pyramid
+        return pyramid
 
-    @staticmethod
-    def _full_res_flow(flow: np.ndarray, w: int, h: int) -> np.ndarray:
-        fh, fw = flow.shape[:2]
-        if (fw, fh) == (w, h):
-            return flow
-        # Upsample the field, then scale the vectors: 3 px of motion at 640 px is 9 px at 1920 px.
-        full = cv2.resize(flow, (w, h), interpolation=cv2.INTER_LINEAR)
-        full *= np.array([w / fw, h / fh], dtype=np.float32)
-        return full
-
-    def _identity_grid(self, h: int, w: int) -> np.ndarray:
-        if self._grid_shape != (h, w):
-            xs, ys = np.meshgrid(np.arange(w, dtype=np.float32), np.arange(h, dtype=np.float32))
-            self._grid = np.dstack((xs, ys))
-            self._grid_shape = (h, w)
-        return self._grid
+    def _flow_level(self, pyramid: list[np.ndarray]) -> int:
+        """Finest pyramid level whose longest side fits in max_side (flow is upscaled from there)."""
+        for level, img in enumerate(pyramid):
+            if max(img.shape) <= self.max_side:
+                return level
+        return len(pyramid) - 1
 
 
 def create_interpolator(mode: str, max_side: int, preset: str, scene_cut_threshold: float) -> Interpolator:

@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Reads engine reports from interp.progress.
+ * Reads worker reports from interp.progress.
  * concurrency = 1 on purpose: reports are handled in order, so "is this the last chunk?" can't race.
  */
 @Slf4j

@@ -17,7 +17,7 @@ import java.util.Map;
 
 /**
  * Everything job-service sends to RabbitMQ. Bodies are plain JSON (no Java type headers),
- * so the Python engine and the Node BFF can read them as easily as Java can.
+ * so the Java worker and the Node BFF can read them as easily as Java can.
  */
 @Slf4j
 @Component
@@ -27,12 +27,12 @@ public class MessagePublisher {
     private final RabbitTemplate rabbitTemplate;
     private final ObjectMapper objectMapper;
 
-    /** Work queue: RabbitMQ hands each chunk to exactly one engine replica. */
+    /** Work queue: RabbitMQ hands each chunk to exactly one worker replica. */
     public void publishChunk(ChunkTask task) {
         send("", RabbitConfig.CHUNK_QUEUE, task, true);
     }
 
-    /** Fanout: every engine replica hears it and stops work on that job. */
+    /** Fanout: every worker replica hears it and stops work on that job. */
     public void publishCancel(Integer jobId) {
         send(RabbitConfig.CANCEL_EXCHANGE, "", Map.of("jobId", jobId), false);
     }

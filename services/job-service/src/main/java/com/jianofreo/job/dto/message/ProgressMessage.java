@@ -5,7 +5,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/** Sent by the engine on interp.progress. status is PROGRESS, DONE or FAILED. */
+/** Sent by the interpolation-worker on interp.progress. status is PROGRESS, DONE or FAILED. */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

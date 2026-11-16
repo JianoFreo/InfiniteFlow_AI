@@ -1,12 +1,13 @@
-# InfiniteFlow: BFF + 3 microservices
+# InfiniteFlow: BFF + 3 Java microservices. Python is only the AI math, run by the Java worker.
 #
 #   browser ─► frontend (nginx :8080) ─► backend / BFF (:5000)
 #                                          ├─► job-service   (Spring, :8081) ─► jobs_db
 #                                          └─► media-service (Spring, :8082) ─► media_db + /data
-#   job-service ─(RabbitMQ)─► interpolation-engine × N ─(RabbitMQ)─► job-service ─► BFF ─(SSE)─► browser
+#   job-service ─(RabbitMQ)─► interpolation-worker × N (Spring) ─(RabbitMQ)─► job-service ─► BFF ─(SSE)─► browser
+#                                  └─ per chunk: python -m app.run_chunk  (NumPy math, stdin/stdout only)
 #
 # Run from the repo root:   docker compose -f infra/docker-compose.yml up --build
-# More engine replicas:     docker compose -f infra/docker-compose.yml up -d --scale interpolation-engine=4
+# More worker replicas:     docker compose -f infra/docker-compose.yml up -d --scale interpolation-worker=4
 
 name: infiniteflow
 
@@ -81,22 +82,28 @@ services:
       retries: 40
     restart: unless-stopped
 
-  interpolation-engine:
-    build: ../services/interpolation-engine
+  interpolation-worker:
+    build:
+      context: ../services          # needs both interpolation-worker/ (Java) and interpolation-engine/ (Python)
+      dockerfile: interpolation-worker/Dockerfile
     environment:
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/%2F
+      RABBITMQ_HOST: rabbitmq
       JOB_SERVICE_URL: http://job-service:8081
+      # Read by the Python engine (inherited by the child process)
       FLOW_PRESET: medium
       FLOW_MAX_SIDE: "640"
-      # CPU threads per replica. Rule of thumb: CPU cores / replicas (0 = all cores). 4 x 3 measured best on 12 cores.
-      ENGINE_THREADS: ${ENGINE_THREADS:-3}
     volumes:
       - data:/data
     depends_on:
       rabbitmq:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:8083/actuator/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 40
     deploy:
-      replicas: ${ENGINE_REPLICAS:-4}
+      replicas: 2
     restart: unless-stopped
 
   backend:
