@@ -1,11 +1,36 @@
-# InfiniteFlow AI - Video Frame Interpolation
+<div align="center">
+
+# InfiniteFlow AI
+
+**Video Frame Interpolation**
 
 Upload a video, pick a factor (2x to 8x), and watch it come back smoother.
-InfiniteFlow creates the in-between frames with a **hand-written optical-flow engine in Python (NumPy)**: no pretrained models and no OpenCV flow.
 
-![alt text](image.png)
-<img width="1208" height="620" alt="image" src="https://github.com/user-attachments/assets/198c65e8-cfb6-483f-897a-cabd98f1dc0d" />
+Hand-written optical-flow engine powered by **Python + NumPy**. No pretrained models. No OpenCV flow.
 
+# [Landing Page](https://infiniteflow-ai.onrender.com)
+
+[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
+[![NumPy](https://img.shields.io/badge/NumPy-Scientific_Computing-013243?style=for-the-badge&logo=numpy&logoColor=white)](https://numpy.org/)
+[![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Spring Boot](https://img.shields.io/badge/Spring_Boot-4-6DB33F?style=for-the-badge&logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
+[![RabbitMQ](https://img.shields.io/badge/RabbitMQ-FF6600?style=for-the-badge&logo=rabbitmq&logoColor=white)](https://www.rabbitmq.com/)
+[![Redis](https://img.shields.io/badge/Redis-DC382D?style=for-the-badge&logo=redis&logoColor=white)](https://redis.io/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+
+</div>
+
+---
+
+<div align="center">
+  <img width="90%" src="https://github.com/user-attachments/assets/81fdae3c-f5aa-4993-af45-73b23a6e2597" alt="InfiniteFlow AI interface" />
+  <br/><br/>
+  <img width="90%" src="https://github.com/user-attachments/assets/198c65e8-cfb6-483f-897a-cabd98f1dc0d" alt="InfiniteFlow AI video interpolation preview" />
+</div>
+
+
+---
 
 ## MVP Scope
 
@@ -263,35 +288,3 @@ Internally job-service still tracks per-chunk state for retries and crash recove
 - A failing chunk is retried once, then sent to a dead-letter queue and the job fails cleanly.
 - Every step can safely run twice: chunk outputs have fixed names, and duplicate progress messages are ignored.
 - Object storage lifecycle rules delete chunk scratch files after 1 day and expired results after N days.
-
-## Quick Start (local)
-
-```bash
-docker compose -f infra/docker-compose.yml up --build
-docker compose -f infra/docker-compose.yml up -d --scale interpolation-worker=4   # more workers
-```
-
-| URL | What |
-| --- | --- |
-| http://localhost:8080 | App |
-| http://localhost:5000/api/health | API health |
-| http://localhost:9001 | MinIO console |
-| http://localhost:15672 | RabbitMQ console (internal buffer) |
-
-Run the Python engine on its own, with no services (handy for tuning the algorithm):
-
-```bash
-cd services/interpolation-engine
-python -m app.cli input.mp4 output.mp4 --factor 4
-```
-
-## Roadmap
-
-From the current code to this MVP, in order:
-
-1. ~~**Engine: replace OpenCV with hand-written NumPy.**~~ **Done.** Python is limited to AI logic; the Java `interpolation-worker` runs it. `app/engine/` holds the math, `cv2` is gone from the code and the image, and `tests/test_engine.py` checks it against known ground-truth motion.
-2. **Frontend: simplify.** Remove the Queue page and the chunk grid. The pages become Upload → Job (progress, preview, download) → My videos.
-3. **Storage: move from the shared `/data` volume to object storage.** Add MinIO to compose. media-service issues presigned URLs, and workers read and write through the S3 API.
-4. **BFF: scale-ready.** Presigned upload flow, Redis-backed rate limiting, SSE fan-out through Redis pub/sub, and per-job SSE instead of an all-jobs stream.
-5. **Hide the buffer.** Keep RabbitMQ internal. Drop the `job.events` → BFF path in favour of Redis, and stop exposing chunk details in the public API.
-6. **Production deploy (after the MVP):** Kubernetes with an HPA on the BFF and services, KEDA scaling workers on queue depth, managed Postgres with read replicas, S3 + CDN, and user auth and quotas.
