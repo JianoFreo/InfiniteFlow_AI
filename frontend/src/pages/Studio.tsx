@@ -21,10 +21,8 @@ import UploadPage from "./UploadPage";
 
 const STATUE_MODELS = [
   "/models/statue.glb",
-  "/models/statue-lincoln.glb",
   "/models/statue-waterson.glb",
   "/models/statue-dancer.glb",
-  "/models/statue-rutherford.glb",
 ];
 
 type Page = "upload" | "queue" | "job";

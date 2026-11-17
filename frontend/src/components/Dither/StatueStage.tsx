@@ -86,9 +86,10 @@ const StatueStage = ({ modelUrls }: StatueStageProps) => {
         const box = new THREE.Box3().setFromObject(model);
         const size = box.getSize(new THREE.Vector3());
         model.position.sub(box.getCenter(new THREE.Vector3()));
-        pivots[i].base = 2.8 / Math.max(size.x, size.y, size.z);
+        pivots[i].base = 2.3 / Math.max(size.x, size.y, size.z);
         pivots[i].group.add(model);
-      });
+        console.info("[StatueStage] loaded", url, size.toArray().map((v) => +v.toFixed(2)));
+      }, undefined, (err) => console.error("[StatueStage] failed to load", url, err));
     });
     const smooth = (a: number, b: number, x: number) => {
       const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
@@ -138,20 +139,29 @@ const StatueStage = ({ modelUrls }: StatueStageProps) => {
     let rotX = 0;
     let posX = 0;
     let posY = 0;
+    let settled = false;
     const clock = new THREE.Clock();
 
     const frame = () => {
       raf = requestAnimationFrame(frame);
       const t = clock.getElapsedTime();
       const max = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
-      const s = window.scrollY / max; // 0..1 over the whole page
+      const override = import.meta.env.DEV ? Number(new URLSearchParams(location.search).get("stage")) : NaN;
+      const s = Number.isFinite(override) && override > 0 ? Math.min(0.999, override) : window.scrollY / max; // 0..1 over the whole page
 
       // scroll turns the head a full 3D rotation and a half, and sweeps it across the page
       const targetRotY = reduced ? 0.4 : -0.5 + s * Math.PI * 3 + mouse.x * 0.35;
       const targetRotX = reduced ? 0 : 0.08 + mouse.y * 0.15 + Math.sin(s * Math.PI * 2) * 0.12;
       const aspect = camera.aspect;
-      const targetX = Math.cos(s * Math.PI * 3) * (aspect > 1 ? 1.6 : 0.4) + (aspect > 1 ? 0.8 : 0);
+      const targetX = aspect > 1 ? 0.75 + Math.cos(s * Math.PI * 3) * 1.05 : 0;
       const targetY = Math.sin(s * Math.PI * 2) * 0.3;
+      if (!settled) {
+        rotY = targetRotY;
+        rotX = targetRotX;
+        posX = targetX;
+        posY = targetY;
+        settled = true;
+      }
       rotY += (targetRotY - rotY) * 0.08;
       rotX += (targetRotX - rotX) * 0.08;
       posX += (targetX - posX) * 0.06;
@@ -160,7 +170,8 @@ const StatueStage = ({ modelUrls }: StatueStageProps) => {
       const n = pivots.length;
       const slot = Math.min(n - 1, Math.floor(s * n));
       const u = s * n - slot;
-      const ease = smooth(0, 0.16, u) * (1 - smooth(0.84, 1, u));
+      // the first statue is already fully there at the top of the page, the last stays until the bottom
+      const ease = (slot === 0 ? 1 : smooth(0, 0.16, u)) * (slot === n - 1 ? 1 : 1 - smooth(0.84, 1, u));
       pivots.forEach(({ group, base }, i) => {
         const k = i === slot && base > 0 ? ease : 0;
         group.visible = k > 0.01;
@@ -195,7 +206,7 @@ const StatueStage = ({ modelUrls }: StatueStageProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modelUrls.join("|")]);
 
-  return <div ref={hostRef} aria-hidden className="pointer-events-none fixed inset-0 z-[1] opacity-[0.5]" />;
+  return <div ref={hostRef} aria-hidden className="pointer-events-none fixed inset-0 z-1 opacity-[0.8]" />;
 };
 
 export default StatueStage;
