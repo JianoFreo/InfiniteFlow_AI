@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
+import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { prefersReducedMotion } from "../../lib/dither";
 
@@ -37,7 +38,7 @@ interface StatueStageProps {
 }
 
 /**
- * One fixed, full-viewport WebGL canvas behind the page. A real 3D head scan is lit by a moving light
+ * One fixed, full-viewport WebGL canvas behind the page. A real 3D marble statue scan is lit by a moving light
  * and turned by page scroll (true 3D rotation, with parallax drift left/right), then dithered in a shader.
  */
 const StatueStage = ({ modelUrl }: StatueStageProps) => {
@@ -66,20 +67,22 @@ const StatueStage = ({ modelUrl }: StatueStageProps) => {
     const pivot = new THREE.Group();
     scene.add(pivot);
 
-    new GLTFLoader().load(modelUrl, (gltf) => {
+    const draco = new DRACOLoader().setDecoderPath("/draco/");
+    const loader = new GLTFLoader().setDRACOLoader(draco);
+    loader.load(modelUrl, (gltf) => {
       const model = gltf.scene;
       model.traverse((obj) => {
         const mesh = obj as THREE.Mesh;
         if (!mesh.isMesh) return;
         const old = mesh.material as THREE.MeshStandardMaterial;
-        mesh.material = new THREE.MeshStandardMaterial({ color: 0xe8e4dc, roughness: 0.55, metalness: 0, normalMap: old.normalMap });
+        mesh.material = new THREE.MeshStandardMaterial({ color: 0xefece4, roughness: 0.6, metalness: 0, normalMap: old.normalMap ?? null });
       });
-      // centre and normalise to ~2.4 units tall
+      // centre and normalise to ~2.8 units tall
       const box = new THREE.Box3().setFromObject(model);
       const size = box.getSize(new THREE.Vector3());
       const center = box.getCenter(new THREE.Vector3());
       model.position.sub(center);
-      pivot.scale.setScalar(2.4 / size.y);
+      pivot.scale.setScalar(2.8 / size.y);
       pivot.add(model);
     });
 
@@ -166,6 +169,7 @@ const StatueStage = ({ modelUrl }: StatueStageProps) => {
       window.removeEventListener("pointermove", onMove);
       target.dispose();
       ditherMat.dispose();
+      draco.dispose();
       renderer.dispose();
       host.removeChild(renderer.domElement);
     };

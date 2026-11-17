@@ -247,7 +247,7 @@ const Studio = () => {
   return (
     <div className="relative flex min-h-full">
       <DitherField />
-      {page === "upload" && <StatueStage modelUrl="/models/head.glb" />}
+      {page === "upload" && <StatueStage modelUrl="/models/statue.glb" />}
       <SideBar
         navItems={navItems}
         activePage={page === "job" ? "queue" : page}

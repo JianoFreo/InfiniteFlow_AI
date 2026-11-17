@@ -32,7 +32,7 @@ const UploadPage = ({ onUpload }: UploadPageProps) => (
     <Marquee reverse />
     <Steps />
     <p className="relative z-10 px-5 pb-10 text-center font-mono text-[10px] uppercase tracking-widest text-ink-faint sm:px-10">
-      3D head scan: Lee Perry-Smith, CC BY 3.0 (infinite-realities.com)
+      3D scan: George Washington by Horatio Greenough (1840), Smithsonian Open Access, CC0
     </p>
   </>
 );
