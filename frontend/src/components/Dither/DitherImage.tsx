@@ -13,6 +13,8 @@ interface DitherImageProps {
   print?: boolean;
   /** Re-run the print animation when this changes. */
   printKey?: unknown;
+  /** Fill the parent box (object-fit: cover) instead of keeping the image's own aspect. */
+  cover?: boolean;
   className?: string;
 }
 
@@ -22,10 +24,11 @@ const DitherImage = ({
   cells = 200,
   fg = "#ece9e2",
   bg = "#050505",
-  contrast = 1.25,
+  contrast = 1.5,
   brightness = 0,
   print = false,
   printKey,
+  cover = false,
   className,
 }: DitherImageProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -100,7 +103,7 @@ const DitherImage = ({
     };
   }, [src, cells, fg, bg, contrast, brightness, print, printKey]);
 
-  return <canvas ref={canvasRef} className={className} style={{ imageRendering: "pixelated", width: "100%", height: "auto", display: "block" }} />;
+  return <canvas ref={canvasRef} className={className} style={{ imageRendering: "pixelated", width: "100%", height: cover ? "100%" : "auto", objectFit: "cover", display: "block" }} />;
 };
 
 export default DitherImage;

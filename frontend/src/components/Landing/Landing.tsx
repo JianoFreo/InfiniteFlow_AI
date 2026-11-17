@@ -1,11 +1,11 @@
 import { ArrowDown } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
+import { STATUES } from "../../lib/statues";
 import { useScrollVar } from "../../lib/useScrollVar";
 import DitherImage from "../Dither/DitherImage";
 import Reveal from "./Reveal";
 
-const STATUE = "/statue.png";
 const WORDS = ["IN-BETWEEN FRAMES", "OPTICAL FLOW", "24 → 240 FPS", "HAND-WRITTEN NUMPY", "NO PRETRAINED MODELS", "∞ FLOW"];
 
 const Marquee = ({ reverse }: { reverse?: boolean }) => (
@@ -26,17 +26,29 @@ const Marquee = ({ reverse }: { reverse?: boolean }) => (
 
 const Hero = () => {
   const ref = useRef<HTMLElement>(null);
+  const [idx, setIdx] = useState(0);
   useScrollVar(ref, "exit");
+  // a new statue is "printed" every few seconds
+  useEffect(() => {
+    const t = setInterval(() => setIdx((i) => (i + 1) % STATUES.length), 5200);
+    return () => clearInterval(t);
+  }, []);
+  const src = STATUES[idx];
 
   return (
     <section ref={ref} className="relative flex min-h-screen items-center justify-center overflow-hidden">
-      <div className="hero-stage relative w-[min(78vw,460px)]">
-        <div className="hero-statue relative">
-          <DitherImage src={STATUE} cells={170} print className="block" />
+      <div className="hero-stage relative w-[min(70vw,440px)]">
+        <div className="hero-statue relative aspect-[4/5]">
+          <div className="absolute inset-0">
+            <DitherImage src={src} cells={190} print printKey={idx} cover />
+          </div>
           <div className="hero-ghost absolute inset-0">
-            <DitherImage src={STATUE} cells={170} fg="#050505" bg="#ece9e2" print />
+            <DitherImage src={src} cells={190} fg="#050505" bg="#ece9e2" print printKey={idx} cover />
           </div>
         </div>
+        <p className="mt-3 text-center font-mono text-[10px] uppercase tracking-widest text-ink-faint">
+          Plate {String(idx + 1).padStart(2, "0")} / {STATUES.length}
+        </p>
       </div>
 
       <h1 className="hero-word hero-word-a font-display" aria-label="Infinite Flow">
@@ -61,7 +73,7 @@ const Hero = () => {
   );
 };
 
-const RING = 6;
+const RING = STATUES.length;
 
 const StatueRing = () => {
   const ref = useRef<HTMLElement>(null);
@@ -82,10 +94,11 @@ const StatueRing = () => {
         <div className="ring-scene absolute inset-0 grid place-items-center">
           <div className="ring">
             {Array.from({ length: RING }, (_, i) => (
-              <div key={i} className="ring-item" style={{ "--i": i } as CSSProperties}>
+              <div key={i} className="ring-item" style={{ "--i": i, "--n": RING } as CSSProperties}>
                 <DitherImage
-                  src={STATUE}
+                  src={STATUES[i]}
                   cells={110}
+                  cover
                   fg={i % 2 ? "#050505" : "#ece9e2"}
                   bg={i % 2 ? "#ece9e2" : "#050505"}
                 />
@@ -102,6 +115,34 @@ const StatueRing = () => {
   );
 };
 
+
+const Gallery = () => {
+  const ref = useRef<HTMLElement>(null);
+  useScrollVar(ref, "sticky");
+  return (
+    <section ref={ref} className="relative h-[420vh]">
+      <div className="sticky top-0 flex h-screen flex-col justify-center overflow-hidden">
+        <p className="absolute left-5 top-8 font-mono text-[11px] uppercase tracking-widest text-ink-dim sm:left-8">
+          02 / Frame by frame
+        </p>
+        <div className="gallery-track flex gap-6 px-[8vw]">
+          {STATUES.map((src, i) => (
+            <figure key={src} className="gallery-card shrink-0" style={{ "--k": i } as CSSProperties}>
+              <div className="aspect-[4/5] w-[62vw] border border-line-strong sm:w-[30vw] lg:w-[22vw]">
+                <DitherImage src={src} cells={150} cover fg={i % 3 === 1 ? "#050505" : "#ece9e2"} bg={i % 3 === 1 ? "#ece9e2" : "#050505"} />
+              </div>
+              <figcaption className="mt-2 flex justify-between font-mono text-[10px] uppercase tracking-widest text-ink-faint">
+                <span>Frame {String(i + 1).padStart(2, "0")}</span>
+                <span>{24 * (i + 1)} fps</span>
+              </figcaption>
+            </figure>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+};
+
 const STEPS = [
   ["01", "Upload", "Your clip is streamed in and probed for fps, size and audio."],
   ["02", "Chunk", "It is cut into short chunks so many workers can chew in parallel."],
@@ -112,7 +153,7 @@ const STEPS = [
 const Steps = () => (
   <section className="mx-auto max-w-6xl px-5 py-32 sm:px-8">
     <Reveal as="p" className="mb-10 font-mono text-[11px] uppercase tracking-widest text-ink-dim">
-      02 / How it flows
+      03 / How it flows
     </Reveal>
     <div>
       {STEPS.map(([n, title, text], i) => (
@@ -133,6 +174,7 @@ const Landing = () => (
     <Marquee />
     <StatueRing />
     <Marquee reverse />
+    <Gallery />
     <Steps />
   </>
 );
