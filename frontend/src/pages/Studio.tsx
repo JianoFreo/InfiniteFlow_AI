@@ -1,4 +1,4 @@
-import { PanelLeftOpen } from "lucide-react";
+import { Menu } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import ConfirmDialog from "../components/ConfirmDialog";
@@ -244,7 +244,7 @@ const Studio = () => {
           aria-label="Open sidebar"
           title="Open sidebar"
         >
-          <PanelLeftOpen className="size-5" />
+          <Menu className="size-5" strokeWidth={1.75} />
         </button>
         <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-14 sm:px-6 lg:py-8">
           {page === "upload" && <UploadPage onUpload={uploadJob} />}

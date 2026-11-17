@@ -1,4 +1,4 @@
-import { Infinity as InfinityIcon, PanelLeftClose, SquarePen, Trash2, X } from "lucide-react";
+import { ChevronLeft, Infinity as InfinityIcon, Plus, Trash2, X } from "lucide-react";
 import type { Job } from "../interface/Job";
 import { isActive } from "../interface/Job";
 import { cn, timeAgo } from "../lib/utils";
@@ -52,7 +52,7 @@ const SideBar = ({ jobs, loaded, activeJobId, onNewVideo, onOpenJob, onDeleteJob
           aria-label="Collapse sidebar"
           title="Collapse sidebar"
         >
-          <PanelLeftClose className="size-5" />
+          <ChevronLeft className="size-5" strokeWidth={1.75} />
         </button>
       </div>
 
@@ -60,11 +60,11 @@ const SideBar = ({ jobs, loaded, activeJobId, onNewVideo, onOpenJob, onDeleteJob
         <button
           onClick={onNewVideo}
           className={cn(
-            "flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors hover:bg-panel-2",
+            "flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors hover:bg-panel-2",
             activeJobId == null && "bg-panel-2",
           )}
         >
-          <SquarePen className="size-4" strokeWidth={1.75} />
+          <Plus className="size-4" strokeWidth={2} />
           New video
         </button>
       </div>
