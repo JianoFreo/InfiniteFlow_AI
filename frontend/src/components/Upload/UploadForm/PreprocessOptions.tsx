@@ -1,4 +1,3 @@
-import { Check } from "lucide-react";
 import type { PreprocessStep } from "../../../interface/Job";
 import { cn } from "../../../lib/utils";
 
@@ -39,7 +38,6 @@ const PreprocessOptions = ({ value, disabled, onChange }: PreprocessOptionsProps
                 on ? "border-ink-dim bg-panel-2 text-ink" : "border-line-strong text-ink-dim hover:bg-panel-2 hover:text-ink",
               )}
             >
-              {on && <Check className="size-3.5" />}
               {title}
             </button>
           );

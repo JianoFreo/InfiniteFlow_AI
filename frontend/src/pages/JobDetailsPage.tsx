@@ -1,4 +1,4 @@
-import { Ban, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import ChunkGrid from "../components/JobDetails/ChunkGrid";
 import JobOverview from "../components/JobDetails/JobOverview";
 import OutputPlayer from "../components/JobDetails/OutputPlayer";
@@ -41,9 +41,9 @@ const JobDetailsPage = ({ job, error, busy, onCancel, onDelete }: JobDetailsPage
             <button
               onClick={() => onCancel(job.id)}
               disabled={busy}
-              className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-sm text-ink-dim hover:border-warn/50 hover:text-warn disabled:opacity-50"
+              className="rounded-lg border border-line px-3 py-1.5 text-sm text-ink-dim hover:border-warn/50 hover:text-warn disabled:opacity-50"
             >
-              <Ban className="size-4" /> Cancel
+              Cancel
             </button>
           )}
           <button
@@ -51,7 +51,7 @@ const JobDetailsPage = ({ job, error, busy, onCancel, onDelete }: JobDetailsPage
             disabled={busy}
             className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-sm text-ink-dim hover:border-bad/50 hover:text-bad disabled:opacity-50"
           >
-            <Trash2 className="size-4" /> Delete
+            <Trash2 className="size-4" strokeWidth={1.75} /> Delete
           </button>
         </div>
       </div>

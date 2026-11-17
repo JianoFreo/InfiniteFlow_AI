@@ -1,4 +1,4 @@
-import { Infinity as InfinityIcon, PanelLeftClose, Plus, Trash2, X } from "lucide-react";
+import { Infinity as InfinityIcon, PanelLeftClose, SquarePen, Trash2, X } from "lucide-react";
 import type { Job } from "../interface/Job";
 import { isActive } from "../interface/Job";
 import { cn, timeAgo } from "../lib/utils";
@@ -39,7 +39,7 @@ const SideBar = ({ jobs, loaded, activeJobId, onNewVideo, onOpenJob, onDeleteJob
     >
       <div className="flex items-center justify-between px-4 pt-4">
         <div className="flex items-center gap-2">
-          <InfinityIcon className="size-5" strokeWidth={2.4} />
+          <InfinityIcon className="size-5" strokeWidth={1.75} />
           <span className="font-semibold tracking-tight">InfiniteFlow</span>
           {!live && <span className="size-2 rounded-full bg-warn" title="Reconnecting…" />}
         </div>
@@ -60,11 +60,12 @@ const SideBar = ({ jobs, loaded, activeJobId, onNewVideo, onOpenJob, onDeleteJob
         <button
           onClick={onNewVideo}
           className={cn(
-            "flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors hover:bg-panel-2",
+            "flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors hover:bg-panel-2",
             activeJobId == null && "bg-panel-2",
           )}
         >
-          <Plus className="size-4.5" /> New video
+          <SquarePen className="size-4" strokeWidth={1.75} />
+          New video
         </button>
       </div>
 

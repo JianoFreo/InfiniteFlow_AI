@@ -1,4 +1,4 @@
-import { CheckCircle2, X, XCircle } from "lucide-react";
+import { X } from "lucide-react";
 import { useEffect } from "react";
 import { cn } from "../lib/utils";
 
@@ -16,7 +16,6 @@ const Toast = ({ toast, onClose }: { toast: ToastMessage | null; onClose: () => 
   }, [toast, onClose]);
 
   if (!toast) return null;
-  const Icon = toast.tone === "ok" ? CheckCircle2 : XCircle;
   return (
     <div className="fixed inset-x-4 bottom-4 z-50 flex justify-center sm:inset-x-auto sm:right-6 sm:bottom-6" role="status">
       <div
@@ -25,7 +24,6 @@ const Toast = ({ toast, onClose }: { toast: ToastMessage | null; onClose: () => 
           toast.tone === "ok" ? "border-ok/30" : "border-bad/40",
         )}
       >
-        <Icon className={cn("mt-0.5 size-4 shrink-0", toast.tone === "ok" ? "text-ok" : "text-bad")} />
         <p className="flex-1">{toast.text}</p>
         <button onClick={onClose} className="text-ink-faint hover:text-ink" aria-label="Dismiss">
           <X className="size-4" />

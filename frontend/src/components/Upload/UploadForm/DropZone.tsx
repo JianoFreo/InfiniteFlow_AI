@@ -1,4 +1,4 @@
-import { FileVideo, UploadCloud, X } from "lucide-react";
+import { Upload, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { cn, formatBytes, formatDuration } from "../../../lib/utils";
 
@@ -45,7 +45,6 @@ const DropZone = ({ file, disabled, onFile }: DropZoneProps) => {
           }}
         />
         <div className="flex items-center gap-3 p-3">
-          <FileVideo className="size-5 shrink-0 text-ink-dim" />
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium">{file.name}</p>
             <p className="text-xs text-ink-faint">
@@ -82,11 +81,11 @@ const DropZone = ({ file, disabled, onFile }: DropZoneProps) => {
         pick(event.dataTransfer.files);
       }}
       className={cn(
-        "flex w-full flex-col items-center justify-center gap-3 rounded-xl border px-6 py-12 text-center transition-colors",
+        "flex w-full flex-col items-center justify-center gap-2 rounded-xl border px-6 py-12 text-center transition-colors",
         dragging ? "border-ink-dim bg-panel-2" : "border-line-strong hover:bg-panel-2/60",
       )}
     >
-      <UploadCloud className="size-6 text-ink-dim" />
+      <Upload className="size-5 text-ink-faint" strokeWidth={1.75} />
       <div>
         <p className="text-sm font-medium">Drop a video here, or click to browse</p>
         <p className="mt-1 text-xs text-ink-faint">MP4, MOV, MKV, WebM · up to 4 GB</p>

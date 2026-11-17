@@ -22,7 +22,7 @@ const OutputPlayer = ({ job }: { job: Job }) => {
           href={`${src}?attachment=1`}
           className="flex items-center gap-2 rounded-lg bg-flow px-3.5 py-2 text-sm font-medium text-canvas hover:bg-flow-strong"
         >
-          <Download className="size-4" />
+          <Download className="size-4" strokeWidth={1.75} />
           Download
         </a>
       </div>
