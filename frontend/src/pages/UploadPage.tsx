@@ -1,4 +1,3 @@
-import PipelineExplainer from "../components/Upload/PipelineExplainer";
 import UploadForm from "../components/Upload/UploadForm";
 import type { UploadProgressInfo } from "../components/Upload/UploadForm";
 import type { JobMode, PreprocessStep } from "../interface/Job";
@@ -11,9 +10,9 @@ interface UploadPageProps {
 }
 
 const UploadPage = ({ onUpload }: UploadPageProps) => (
-  <div className="grid gap-6 lg:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)]">
+  <div className="mx-auto max-w-2xl pt-6 sm:pt-16">
+    <h1 className="mb-8 text-center text-3xl font-semibold tracking-tight">What should we smooth today?</h1>
     <UploadForm onSubmit={onUpload} />
-    <PipelineExplainer />
   </div>
 );
 

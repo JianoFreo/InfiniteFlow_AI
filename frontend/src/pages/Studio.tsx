@@ -1,25 +1,21 @@
-import { ListVideo, UploadCloud } from "lucide-react";
+import { PanelLeftOpen } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import ConfirmDialog from "../components/ConfirmDialog";
-import Header from "../components/Header";
 import SideBar from "../components/SideBar";
 import SpaceBackground from "../components/SpaceBackground";
-import type { NavItem, ServiceHealth } from "../components/SideBar";
 import Toast from "../components/Toast";
 import type { ToastMessage } from "../components/Toast";
 import type { UploadProgressInfo } from "../components/Upload/UploadForm";
-import type { Job, JobChangeEvent, JobDetail, JobMode, PreprocessStep } from "../interface/Job";
 import { isActive } from "../interface/Job";
+import type { Job, JobChangeEvent, JobDetail, JobMode, PreprocessStep } from "../interface/Job";
 import { api, errorMessage } from "../lib/axios";
 import { connectJobStream } from "../services/job-sse/connectJobStream";
 import type { StreamState } from "../services/job-sse/connectJobStream";
 import JobDetailsPage from "./JobDetailsPage";
-import QueuePage from "./QueuePage";
 import UploadPage from "./UploadPage";
 
-type Page = "upload" | "queue" | "job";
-const PAGES: Page[] = ["upload", "queue", "job"];
+type Page = "upload" | "job";
 const DETAIL_REFRESH_MS = 1000;
 
 /**
@@ -29,17 +25,30 @@ const DETAIL_REFRESH_MS = 1000;
 const Studio = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const rawPage = searchParams.get("page") as Page | null;
-  const page: Page = rawPage && PAGES.includes(rawPage) ? rawPage : "upload";
   const jobId = Number(searchParams.get("id")) || null;
+  const page: Page = rawPage === "job" && jobId ? "job" : "upload";
 
   const [jobs, setJobs] = useState<Job[]>([]);
   const [jobsLoaded, setJobsLoaded] = useState(false);
   const [selected, setSelected] = useState<JobDetail | null>(null);
   const [selectedError, setSelectedError] = useState<string | null>(null);
-  const [health, setHealth] = useState<ServiceHealth>(null);
   const [streamState, setStreamState] = useState<StreamState>("connecting");
-  const [reloading, setReloading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem("sidebar-collapsed") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const setCollapsedPersist = (value: boolean) => {
+    setCollapsed(value);
+    try {
+      localStorage.setItem("sidebar-collapsed", value ? "1" : "0");
+    } catch {
+      // storage unavailable: the choice just won't persist
+    }
+  };
   const [busyId, setBusyId] = useState<number | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Job | null>(null);
   const [toast, setToast] = useState<ToastMessage | null>(null);
@@ -73,25 +82,13 @@ const Studio = () => {
     }
   }, []);
 
-  const loadHealth = useCallback(async () => {
-    try {
-      const { data } = await api.get<{ services: ServiceHealth }>("/api/health", { validateStatus: () => true });
-      setHealth(data.services ?? null);
-    } catch {
-      setHealth({ bff: "DOWN" });
-    }
-  }, []);
-
   const loadData = useCallback(async () => {
-    setReloading(true);
     const results = await Promise.allSettled([
       loadJobs(),
-      loadHealth(),
       jobIdRef.current ? loadJob(jobIdRef.current) : Promise.resolve(),
     ]);
     if (results[0].status === "rejected") notify("bad", errorMessage(results[0].reason, "Could not load jobs"));
-    setReloading(false);
-  }, [loadJobs, loadHealth, loadJob, notify]);
+  }, [loadJobs, loadJob, notify]);
 
   /** Refetch the open job at most once a second while events stream in (keeps the chunk grid live). */
   const scheduleDetailRefresh = useCallback(
@@ -160,11 +157,6 @@ const Studio = () => {
   );
 
   useEffect(() => {
-    const timer = setInterval(() => void loadHealth(), 30_000);
-    return () => clearInterval(timer);
-  }, [loadHealth]);
-
-  useEffect(() => {
     setSelected(null);
     setSelectedError(null);
     if (page === "job" && jobId) void loadJob(jobId);
@@ -219,7 +211,7 @@ const Studio = () => {
       await api.delete(`/api/jobs/${id}`);
       setJobs((prev) => prev.filter((job) => job.id !== id));
       notify("ok", `Job #${id} deleted`);
-      if (jobIdRef.current === id) navigate("queue");
+      if (jobIdRef.current === id) navigate("upload");
     } catch (err) {
       notify("bad", errorMessage(err, "Could not delete"));
     } finally {
@@ -228,60 +220,39 @@ const Studio = () => {
     }
   };
 
-  const activeCount = jobs.filter(isActive).length;
-  const navItems: NavItem[] = [
-    { page: "upload", label: "New video", icon: UploadCloud },
-    { page: "queue", label: "Queue", icon: ListVideo, badge: activeCount || undefined },
-  ];
-
-  const titles: Record<Page, { title: string; subtitle: string }> = {
-    upload: { title: "New video", subtitle: "Upload a clip and choose how smooth it should be" },
-    queue: { title: "Queue", subtitle: `${jobs.length} job${jobs.length === 1 ? "" : "s"} · ${activeCount} running` },
-    job: {
-      title: selected ? selected.source.fileName : jobId ? `Job #${jobId}` : "Job",
-      subtitle: selected ? `Job #${selected.id} · ${selected.factor}× · ${selected.mode}` : "",
-    },
-  };
-
   return (
     <div className="relative flex min-h-full">
-      <SpaceBackground intensity={1 + Math.min(7, activeCount * 2)} />
+      <SpaceBackground intensity={1 + Math.min(7, jobs.filter(isActive).length * 2)} />
       <SideBar
-        navItems={navItems}
-        activePage={page === "job" ? "queue" : page}
-        onNavigate={(next) => navigate(next as Page)}
+        jobs={jobs}
+        loaded={jobsLoaded}
+        activeJobId={page === "job" ? jobId : null}
+        onNewVideo={() => navigate("upload")}
+        onOpenJob={(id) => navigate("job", id)}
+        onDeleteJob={setPendingDelete}
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
-        health={health}
+        live={streamState === "live"}
+        collapsed={collapsed}
+        onCollapse={() => setCollapsedPersist(true)}
       />
 
       <div className="relative z-10 flex min-w-0 flex-1 flex-col">
-        <Header
-          {...titles[page]}
-          streamState={streamState}
-          onMenu={() => setSidebarOpen(true)}
-          onReload={() => void loadData()}
-          reloading={reloading}
-        />
-        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 sm:py-8">
+        <button
+          className={`fixed left-3 top-3 z-20 rounded-lg bg-panel p-2 text-ink-dim hover:text-ink ${collapsed ? "" : "lg:hidden"}`}
+          onClick={() => (window.matchMedia("(min-width: 1024px)").matches ? setCollapsedPersist(false) : setSidebarOpen(true))}
+          aria-label="Open sidebar"
+          title="Open sidebar"
+        >
+          <PanelLeftOpen className="size-5" />
+        </button>
+        <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-14 sm:px-6 lg:py-8">
           {page === "upload" && <UploadPage onUpload={uploadJob} />}
-          {page === "queue" && (
-            <QueuePage
-              jobs={jobs}
-              loaded={jobsLoaded}
-              busyId={busyId}
-              onOpen={(id) => navigate("job", id)}
-              onCancel={(id) => void cancelJob(id)}
-              onDelete={setPendingDelete}
-              onUpload={() => navigate("upload")}
-            />
-          )}
           {page === "job" && (
             <JobDetailsPage
               job={selected}
               error={jobId ? selectedError : "No job selected."}
               busy={busyId === jobId}
-              onBack={() => navigate("queue")}
               onCancel={(id) => void cancelJob(id)}
               onDelete={setPendingDelete}
             />

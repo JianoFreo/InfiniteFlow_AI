@@ -1,4 +1,4 @@
-import { ArrowLeft, Ban, Trash2 } from "lucide-react";
+import { Ban, Trash2 } from "lucide-react";
 import ChunkGrid from "../components/JobDetails/ChunkGrid";
 import JobOverview from "../components/JobDetails/JobOverview";
 import OutputPlayer from "../components/JobDetails/OutputPlayer";
@@ -9,22 +9,14 @@ interface JobDetailsPageProps {
   job: JobDetail | null;
   error: string | null;
   busy: boolean;
-  onBack: () => void;
   onCancel: (id: number) => void;
   onDelete: (job: Job) => void;
 }
 
-const JobDetailsPage = ({ job, error, busy, onBack, onCancel, onDelete }: JobDetailsPageProps) => {
-  const back = (
-    <button onClick={onBack} className="flex items-center gap-1.5 text-sm text-ink-dim hover:text-ink">
-      <ArrowLeft className="size-4" /> Back to queue
-    </button>
-  );
-
+const JobDetailsPage = ({ job, error, busy, onCancel, onDelete }: JobDetailsPageProps) => {
   if (error) {
     return (
       <div className="space-y-4">
-        {back}
         <p className="rounded-2xl border border-bad/30 bg-bad/8 p-5 text-sm text-bad">{error}</p>
       </div>
     );
@@ -32,7 +24,6 @@ const JobDetailsPage = ({ job, error, busy, onBack, onCancel, onDelete }: JobDet
   if (!job) {
     return (
       <div className="space-y-4">
-        {back}
         <div className="h-64 animate-pulse rounded-2xl border border-line bg-panel" />
       </div>
     );
@@ -41,8 +32,11 @@ const JobDetailsPage = ({ job, error, busy, onBack, onCancel, onDelete }: JobDet
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-3">
-        {back}
-        <div className="ml-auto flex gap-2">
+        <div className="min-w-0 flex-1">
+          <h1 className="truncate text-xl font-semibold tracking-tight">{job.source.fileName}</h1>
+          <p className="text-sm text-ink-faint">Job #{job.id} · {job.factor}× · {job.mode}</p>
+        </div>
+        <div className="flex gap-2">
           {isActive(job) && (
             <button
               onClick={() => onCancel(job.id)}
