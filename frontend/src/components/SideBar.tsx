@@ -38,7 +38,7 @@ const SideBar = ({ navItems, activePage, onNavigate, open, onClose, health }: Si
     >
       <div className="flex h-16 items-center justify-between px-5">
         <div className="flex items-center gap-2.5">
-          <span className="grid size-9 place-items-center bg-ink text-canvas">
+          <span className="grid size-9 place-items-center border border-line-strong bg-panel-2 text-ink">
             <InfinityIcon className="size-5" strokeWidth={2.4} />
           </span>
           <div className="leading-tight">
@@ -60,7 +60,7 @@ const SideBar = ({ navItems, activePage, onNavigate, open, onClose, health }: Si
               onClick={() => onNavigate(page)}
               className={cn(
                 "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
-                active ? "bg-ink text-canvas" : "text-ink-dim hover:bg-panel-2 hover:text-ink",
+                active ? "border-l-2 border-flow bg-panel-2 text-ink" : "text-ink-dim hover:bg-panel-2 hover:text-ink",
               )}
             >
               <Icon className="size-4.5" />

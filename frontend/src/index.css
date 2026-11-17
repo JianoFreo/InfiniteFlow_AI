@@ -2,7 +2,6 @@
 
 @theme {
   --font-sans: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Anton", "Space Grotesk", Impact, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 
   /* Sharp, printed-matter corners everywhere */
@@ -14,18 +13,18 @@
   --radius-2xl: 0;
   --radius-3xl: 0;
 
-  --color-canvas: #050505;
-  --color-panel: #0b0b0b;
-  --color-panel-2: #151515;
-  --color-line: #232323;
-  --color-line-strong: #3a3a3a;
+  --color-canvas: #05060a;
+  --color-panel: rgb(10 11 16 / 0.8);
+  --color-panel-2: rgb(19 21 28 / 0.9);
+  --color-line: #1b1e26;
+  --color-line-strong: #2c303b;
   --color-ink: #ece9e2;
   --color-ink-dim: #a09d96;
   --color-ink-faint: #67645f;
 
-  --color-flow: #ece9e2;
-  --color-flow-strong: #ece9e2;
-  --color-pulse: #a09d96;
+  --color-flow: #8fa0cc;
+  --color-flow-strong: #7486b8;
+  --color-pulse: #66739c;
   --color-ok: #7dff9b;
   --color-warn: #ffd166;
   --color-bad: #ff6b6b;
@@ -49,84 +48,42 @@ body {
   color: var(--color-canvas);
 }
 
-/* Film grain over everything */
-body::after {
+/*
+ * Speckled deep space: a near-black base with very faint dust flecks (the stars live in SpaceBackground.tsx).
+ * No animation, nothing over the panels.
+ */
+body::before {
   content: "";
   position: fixed;
-  inset: -50%;
-  z-index: 100;
+  inset: 0;
+  z-index: 0;
   pointer-events: none;
-  opacity: 0.09;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
-  animation: grain 0.9s steps(6) infinite;
-}
-@keyframes grain {
-  0% { transform: translate(0, 0); }
-  20% { transform: translate(-3%, 2%); }
-  40% { transform: translate(2%, -3%); }
-  60% { transform: translate(-2%, -1%); }
-  80% { transform: translate(3%, 3%); }
-  100% { transform: translate(0, 0); }
+  opacity: 0.16;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='400'><filter id='f' x='0' y='0' width='100%' height='100%'><feTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='2' seed='7' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.66  0 0 0 0 0.67  0 0 0 0 0.7  14 0 0 0 -8.7'/></filter><rect width='100%' height='100%' filter='url(%23f)'/></svg>"), url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='400'><filter id='f' x='0' y='0' width='100%' height='100%'><feTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='2' seed='23' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.03  0 0 0 0 0.03  0 0 0 0 0.04  -14 0 0 0 5.3'/></filter><rect width='100%' height='100%' filter='url(%23f)'/></svg>");
 }
 
-html { scroll-behavior: smooth; }
+#root { position: relative; z-index: 1; }
 
-/* ---------- scroll reveal ---------- */
-.reveal {
-  opacity: 0;
-  transform: translateY(48px) scale(0.98);
-  filter: blur(8px);
-  transition: opacity 0.9s cubic-bezier(0.2, 0.7, 0.2, 1), transform 0.9s cubic-bezier(0.2, 0.7, 0.2, 1),
-    filter 0.9s cubic-bezier(0.2, 0.7, 0.2, 1);
-  transition-delay: var(--d, 0ms);
-}
-.reveal.in { opacity: 1; transform: none; filter: none; }
-
-/* ---------- marquee ---------- */
-.marquee { display: flex; width: max-content; animation: marquee 28s linear infinite; }
-.marquee-reverse { animation-direction: reverse; animation-duration: 36s; }
-@keyframes marquee { to { transform: translateX(-50%); } }
-
-.hero-copy { transform: translateY(calc(var(--p, 0) * 12vh)); opacity: calc(1 - var(--p, 0) * 1.1); }
-
-/* generated in-between frame: a dither dot-matrix block */
-.dither-frame {
-  background-image: radial-gradient(var(--color-ink) 45%, transparent 50%);
-  background-size: 3px 3px;
-  animation: frame-in 0.45s ease-out both;
-}
-@keyframes frame-in { from { opacity: 0; transform: scaleY(0.2); } to { opacity: 1; transform: none; } }
-
-.step-title { transition: transform 0.4s ease, -webkit-text-stroke 0.4s ease, color 0.4s ease; }
-.step:hover .step-title {
-  transform: translateX(1.5rem);
-  color: transparent;
-  -webkit-text-stroke: 1.5px var(--color-ink);
-}
-
-/* Moving stripes on active progress bars */
-@keyframes flow-stripes {
-  from {
-    background-position: 0 0;
-  }
-  to {
-    background-position: 28px 0;
-  }
-}
-
+/* Active progress bars: a speckled comet sweeps along the fill */
 .progress-active {
-  background-image: linear-gradient(
-    135deg,
-    rgb(255 255 255 / 0.18) 25%,
-    transparent 25%,
-    transparent 50%,
-    rgb(255 255 255 / 0.18) 50%,
-    rgb(255 255 255 / 0.18) 75%,
-    transparent 75%,
-    transparent
-  );
-  background-size: 28px 28px;
-  animation: flow-stripes 0.9s linear infinite;
+  position: relative;
+  overflow: hidden;
+}
+.progress-active::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 45%;
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.7));
+  -webkit-mask-image: radial-gradient(#000 45%, transparent 50%);
+  mask-image: radial-gradient(#000 45%, transparent 50%);
+  -webkit-mask-size: 3px 3px;
+  mask-size: 3px 3px;
+  animation: comet 1.5s linear infinite;
+}
+@keyframes comet {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(230%); }
 }
 
 input[type="range"].factor-slider {
@@ -161,7 +118,5 @@ input[type="range"].factor-slider::-moz-range-thumb {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .progress-active, .marquee, .dither-frame, body::after { animation: none; }
-  .reveal { opacity: 1; transform: none; filter: none; transition: none; }
-  html { scroll-behavior: auto; }
+  .progress-active::after, body::before, body::after { animation: none; }
 }

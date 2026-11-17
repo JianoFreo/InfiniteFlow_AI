@@ -1,11 +1,10 @@
 import { ListVideo, UploadCloud } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
-import DitherField from "../components/Dither/DitherField";
-import StatueStage from "../components/Dither/StatueStage";
 import ConfirmDialog from "../components/ConfirmDialog";
 import Header from "../components/Header";
 import SideBar from "../components/SideBar";
+import SpaceBackground from "../components/SpaceBackground";
 import type { NavItem, ServiceHealth } from "../components/SideBar";
 import Toast from "../components/Toast";
 import type { ToastMessage } from "../components/Toast";
@@ -18,12 +17,6 @@ import type { StreamState } from "../services/job-sse/connectJobStream";
 import JobDetailsPage from "./JobDetailsPage";
 import QueuePage from "./QueuePage";
 import UploadPage from "./UploadPage";
-
-const STATUE_MODELS = [
-  "/models/statue.glb",
-  "/models/statue-waterson.glb",
-  "/models/statue-dancer.glb",
-];
 
 type Page = "upload" | "queue" | "job";
 const PAGES: Page[] = ["upload", "queue", "job"];
@@ -252,8 +245,7 @@ const Studio = () => {
 
   return (
     <div className="relative flex min-h-full">
-      <DitherField />
-      {page === "upload" && <StatueStage modelUrls={STATUE_MODELS} />}
+      <SpaceBackground intensity={1 + Math.min(7, activeCount * 2)} />
       <SideBar
         navItems={navItems}
         activePage={page === "job" ? "queue" : page}
@@ -271,7 +263,7 @@ const Studio = () => {
           onReload={() => void loadData()}
           reloading={reloading}
         />
-        <main className={page === "upload" ? "flex-1" : "mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 sm:py-8"}>
+        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 sm:py-8">
           {page === "upload" && <UploadPage onUpload={uploadJob} />}
           {page === "queue" && (
             <QueuePage
