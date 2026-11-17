@@ -1,6 +1,8 @@
 import type { Request, Response } from "express";
 import { jobService } from "../../clients/jobService.client.js";
 import { mediaService } from "../../clients/mediaService.client.js";
+import type { Identity } from "../../middlewares/identity.middleware.js";
+import { loadOwnedJob } from "../../utils/ownedJob.js";
 import { forwardServiceError } from "../../utils/forwardServiceError.js";
 import { outputFileName, toJobDetailView, toJobView } from "../../utils/toJobView.js";
 import type * as dto from "./dto/get.dto.js";
@@ -12,7 +14,8 @@ export const getJobs = async (
   const limit = Math.min(200, Math.max(1, Number(req.query.limit ?? 50) || 50));
   const activeOnly = req.query.activeOnly === "true";
   try {
-    const jobs = await jobService.listJobs(limit, activeOnly);
+    const identity: Identity = res.locals.identity;
+    const jobs = await jobService.listJobs(identity.owner, limit, activeOnly);
     return res.status(200).json({ message: "Jobs retrieved", jobs: jobs.map(toJobView) });
   } catch (err) {
     return forwardServiceError(err, res, "Could not load jobs");
@@ -23,7 +26,9 @@ export const getJobs = async (
 export const getJob = async (req: Request, res: Response<dto.getJob.response | dto.getJob.error>) => {
   const jobId: number = res.locals.jobId;
   try {
-    const [job, chunks] = await Promise.all([jobService.getJob(jobId), jobService.getChunks(jobId)]);
+    const job = await loadOwnedJob(jobId, res);
+    if (!job) return;
+    const chunks = await jobService.getChunks(jobId);
     return res.status(200).json({ message: "Job retrieved", job: toJobDetailView(job, chunks) });
   } catch (err) {
     return forwardServiceError(err, res, "Could not load job");
@@ -35,7 +40,8 @@ const PASSTHROUGH_HEADERS = ["content-type", "content-length", "content-range", 
 export const downloadJob = async (req: Request, res: Response<dto.downloadJob.error>) => {
   const jobId: number = res.locals.jobId;
   try {
-    const job = await jobService.getJob(jobId);
+    const job = await loadOwnedJob(jobId, res);
+    if (!job) return;
     if (job.status !== "COMPLETED" || job.outputMediaId == null) {
       return res.status(409).json({ message: "The video is not ready yet" });
     }

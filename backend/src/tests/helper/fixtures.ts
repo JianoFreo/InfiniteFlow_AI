@@ -5,6 +5,7 @@ export const serviceJob = (overrides: Partial<ServiceJob> = {}): ServiceJob => (
   id: 7,
   status: "PROCESSING",
   mode: "flow",
+  ownerId: "g:test-guest-id-0001",
   factor: 4,
   progress: 40,
   errorMessage: null,

@@ -30,6 +30,25 @@
   --color-bad: #ff6b6b;
 }
 
+/* Light theme: same tokens, different values. Chosen in Settings (or follows the device). */
+:root[data-theme="light"] {
+  --color-canvas: #f6f6f3;
+  --color-panel: rgb(255 255 255 / 0.92);
+  --color-panel-2: rgb(236 236 232 / 0.95);
+  --color-line: #e1e1dc;
+  --color-line-strong: #c9c9c3;
+  --color-ink: #1b1c1f;
+  --color-ink-dim: #55575d;
+  --color-ink-faint: #8a8c92;
+
+  --color-flow: #2f3b63;
+  --color-flow-strong: #232d4d;
+  --color-pulse: #55618a;
+  --color-ok: #15803d;
+  --color-warn: #a16207;
+  --color-bad: #dc2626;
+}
+
 html,
 body,
 #root {

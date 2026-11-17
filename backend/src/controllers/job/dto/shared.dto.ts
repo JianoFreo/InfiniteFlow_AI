@@ -34,6 +34,7 @@ export interface ServiceJob {
   startedAt: string | null;
   finishedAt: string | null;
   preprocess?: string | null;
+  ownerId: string;
 }
 
 export interface ServiceChunk {

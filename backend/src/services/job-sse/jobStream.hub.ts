@@ -23,9 +23,11 @@ export interface JobChangeEvent {
   progress: number;
   completedChunks: number;
   totalChunks: number;
+  /** Who may see this event. Not sent to the browser. */
+  ownerId: string;
 }
 
-const screens = new Set<Response>();
+const screens = new Map<Response, string>(); // screen -> owner
 const pending = new Map<number, JobChangeEvent>();
 let flushTimer: NodeJS.Timeout | null = null;
 let pingTimer: NodeJS.Timeout | null = null;
@@ -35,13 +37,13 @@ const write = (res: Response, event: string, data: unknown) => {
 };
 
 const broadcast = (event: string, data: unknown) => {
-  for (const res of screens) write(res, event, data);
+  for (const res of screens.keys()) write(res, event, data);
 };
 
 export const hasCapacity = () => screens.size < MAX_SCREENS;
 
-export const addScreen = (res: Response) => {
-  screens.add(res);
+export const addScreen = (res: Response, owner: string) => {
+  screens.set(res, owner);
   if (!pingTimer) {
     pingTimer = setInterval(() => broadcast("ping", { at: Date.now() }), PING_MS);
   }
@@ -62,7 +64,11 @@ export const publishJobChange = (event: JobChangeEvent) => {
     flushTimer = null;
     const batch = [...pending.values()];
     pending.clear();
-    if (batch.length > 0) broadcast("job-changed", batch);
+    // Each browser only hears about its own jobs
+    for (const [res, owner] of screens) {
+      const mine = batch.filter((event) => event.ownerId === owner).map(({ ownerId: _owner, ...event }) => event);
+      if (mine.length > 0) write(res, "job-changed", mine);
+    }
   }, FLUSH_MS);
 };
 
@@ -70,7 +76,7 @@ export const getJobStreamStats = () => ({ connectedScreens: screens.size, maxScr
 
 /** Called on SIGTERM so server.close() doesn't hang waiting for open streams. */
 export const closeAllJobStreams = () => {
-  for (const res of screens) res.end();
+  for (const res of screens.keys()) res.end();
   screens.clear();
   if (pingTimer) clearInterval(pingTimer);
   if (flushTimer) clearTimeout(flushTimer);

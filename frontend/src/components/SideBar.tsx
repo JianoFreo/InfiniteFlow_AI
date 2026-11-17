@@ -1,4 +1,5 @@
 import { ChevronLeft, Infinity as InfinityIcon, Plus, Trash2, X } from "lucide-react";
+import type { ReactNode } from "react";
 import type { Job } from "../interface/Job";
 import { isActive } from "../interface/Job";
 import { cn, timeAgo } from "../lib/utils";
@@ -15,6 +16,7 @@ interface SideBarProps {
   live: boolean;
   collapsed: boolean;
   onCollapse: () => void;
+  footer?: ReactNode;
 }
 
 const DOT: Record<Job["status"], string> = {
@@ -27,7 +29,7 @@ const DOT: Record<Job["status"], string> = {
 };
 
 /** ChatGPT-style: new-item button on top, history of past works below. */
-const SideBar = ({ jobs, loaded, activeJobId, onNewVideo, onOpenJob, onDeleteJob, open, onClose, live, collapsed, onCollapse }: SideBarProps) => (
+const SideBar = ({ jobs, loaded, activeJobId, onNewVideo, onOpenJob, onDeleteJob, open, onClose, live, collapsed, onCollapse, footer }: SideBarProps) => (
   <>
     {open && <div className="fixed inset-0 z-30 bg-black/60 lg:hidden" onClick={onClose} aria-hidden />}
     <aside
@@ -99,6 +101,7 @@ const SideBar = ({ jobs, loaded, activeJobId, onNewVideo, onOpenJob, onDeleteJob
           </div>
         ))}
       </nav>
+      {footer}
     </aside>
   </>
 );

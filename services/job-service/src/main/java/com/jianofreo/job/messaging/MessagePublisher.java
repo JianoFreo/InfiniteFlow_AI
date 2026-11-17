@@ -41,11 +41,11 @@ public class MessagePublisher {
     public void publishJobChanged(Job job) {
         send(RabbitConfig.JOB_EVENTS_EXCHANGE, "",
                 new JobEvent(job.getId(), job.getStatus().name(), job.getProgress(),
-                        job.getCompletedChunks(), job.getTotalChunks()), false);
+                        job.getCompletedChunks(), job.getTotalChunks(), job.getOwnerId()), false);
     }
 
-    public void publishJobDeleted(Integer jobId) {
-        send(RabbitConfig.JOB_EVENTS_EXCHANGE, "", new JobEvent(jobId, "DELETED", 0, 0, 0), false);
+    public void publishJobDeleted(Integer jobId, String ownerId) {
+        send(RabbitConfig.JOB_EVENTS_EXCHANGE, "", new JobEvent(jobId, "DELETED", 0, 0, 0, ownerId), false);
     }
 
     private void send(String exchange, String routingKey, Object payload, boolean persistent) {

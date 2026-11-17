@@ -1,6 +1,7 @@
 package com.jianofreo.job.controller;
 
 import com.jianofreo.job.dto.job.ChunkResponse;
+import com.jianofreo.job.dto.job.ClaimRequest;
 import com.jianofreo.job.dto.job.JobRequest;
 import com.jianofreo.job.dto.job.JobResponse;
 import com.jianofreo.job.service.JobService;
@@ -10,6 +11,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 /** Internal API. Called by the BFF, and by the interpolation-worker to check that a job is still active before starting a chunk. */
 @RestController
@@ -26,9 +28,15 @@ public class JobController {
     }
 
     @GetMapping
-    public List<JobResponse> listJobs(@RequestParam(defaultValue = "50") int limit,
+    public List<JobResponse> listJobs(@RequestParam String owner,
+                                      @RequestParam(defaultValue = "50") int limit,
                                       @RequestParam(defaultValue = "false") boolean activeOnly) {
-        return jobService.listJobs(limit, activeOnly);
+        return jobService.listJobs(owner, limit, activeOnly);
+    }
+
+    @PostMapping("claim")
+    public Map<String, Integer> claim(@Valid @RequestBody ClaimRequest request) {
+        return Map.of("moved", jobService.claimJobs(request.getFrom(), request.getTo()));
     }
 
     @GetMapping("{id}")

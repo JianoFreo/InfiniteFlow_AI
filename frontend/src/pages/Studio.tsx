@@ -2,6 +2,11 @@ import { Menu } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import ConfirmDialog from "../components/ConfirmDialog";
+import AccountMenu from "../components/AccountMenu";
+import AuthModal from "../components/AuthModal";
+import type { AuthMode } from "../components/AuthModal";
+import SettingsModal from "../components/SettingsModal";
+import type { SettingsTab } from "../components/SettingsModal";
 import SideBar from "../components/SideBar";
 import SpaceBackground from "../components/SpaceBackground";
 import Toast from "../components/Toast";
@@ -9,7 +14,9 @@ import type { ToastMessage } from "../components/Toast";
 import type { UploadProgressInfo } from "../components/Upload/UploadForm";
 import { isActive } from "../interface/Job";
 import type { Job, JobChangeEvent, JobDetail, JobMode, PreprocessStep } from "../interface/Job";
+import { useAuth } from "../lib/auth";
 import { api, errorMessage } from "../lib/axios";
+import { useSettings } from "../lib/settings";
 import { connectJobStream } from "../services/job-sse/connectJobStream";
 import type { StreamState } from "../services/job-sse/connectJobStream";
 import JobDetailsPage from "./JobDetailsPage";
@@ -23,6 +30,10 @@ const DETAIL_REFRESH_MS = 1000;
  * renders SideBar + Header + the active page, and passes data down as props.
  */
 const Studio = () => {
+  const { user, owner, logout } = useAuth();
+  const { settings, resolvedTheme } = useSettings();
+  const [settingsTab, setSettingsTab] = useState<SettingsTab | null>(null);
+  const [authMode, setAuthMode] = useState<AuthMode | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const rawPage = searchParams.get("page") as Page | null;
   const jobId = Number(searchParams.get("id")) || null;
@@ -153,8 +164,19 @@ const Studio = () => {
         onLive: () => void loadDataRef.current(),
         onJobsChanged: (events) => handleJobEventsRef.current(events),
       }),
-    [],
+    [owner],
   );
+
+  // Guest <-> account switch: the old history is not this person's anymore
+  const firstOwner = useRef(owner);
+  useEffect(() => {
+    if (firstOwner.current === owner) return;
+    firstOwner.current = owner;
+    setJobs([]);
+    setJobsLoaded(false);
+    setSelected(null);
+    setSearchParams({ page: "upload" });
+  }, [owner, setSearchParams]);
 
   useEffect(() => {
     setSelected(null);
@@ -222,7 +244,9 @@ const Studio = () => {
 
   return (
     <div className="relative flex min-h-full">
-      <SpaceBackground intensity={1 + Math.min(7, jobs.filter(isActive).length * 2)} />
+      {settings.starfield && resolvedTheme === "dark" && (
+        <SpaceBackground intensity={1 + Math.min(7, jobs.filter(isActive).length * 2)} />
+      )}
       <SideBar
         jobs={jobs}
         loaded={jobsLoaded}
@@ -235,6 +259,21 @@ const Studio = () => {
         live={streamState === "live"}
         collapsed={collapsed}
         onCollapse={() => setCollapsedPersist(true)}
+        footer={
+          <AccountMenu
+            user={user}
+            onSettings={(tab) => {
+              setSettingsTab(tab);
+              setSidebarOpen(false);
+            }}
+            onLogin={() => setAuthMode("login")}
+            onRegister={() => setAuthMode("register")}
+            onLogout={() => {
+              logout();
+              notify("ok", "Logged out");
+            }}
+          />
+        }
       />
 
       <div className="relative z-10 flex min-w-0 flex-1 flex-col">
@@ -269,6 +308,26 @@ const Studio = () => {
         onConfirm={() => void confirmDelete()}
         onCancel={() => setPendingDelete(null)}
       />
+      {settingsTab && (
+        <SettingsModal
+          tab={settingsTab}
+          onTabChange={setSettingsTab}
+          onClose={() => setSettingsTab(null)}
+          onLogin={() => setAuthMode("login")}
+          onRegister={() => setAuthMode("register")}
+        />
+      )}
+      {authMode && (
+        <AuthModal
+          mode={authMode}
+          onModeChange={setAuthMode}
+          onClose={() => setAuthMode(null)}
+          onDone={(message) => {
+            setAuthMode(null);
+            notify("ok", message);
+          }}
+        />
+      )}
       <Toast toast={toast} onClose={() => setToast(null)} />
     </div>
   );

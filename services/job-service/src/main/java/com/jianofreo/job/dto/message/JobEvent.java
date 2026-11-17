@@ -14,4 +14,6 @@ public class JobEvent {
     private Integer progress;
     private Integer completedChunks;
     private Integer totalChunks;
+    /** Lets the BFF send the event only to the browsers of the job owner. */
+    private String ownerId;
 }

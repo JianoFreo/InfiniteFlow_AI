@@ -1,12 +1,13 @@
 import { Download } from "lucide-react";
 import type { Job } from "../../interface/Job";
 import { apiUrl } from "../../lib/axios";
+import { withAuthQuery } from "../../lib/identity";
 import { formatBytes, formatFps } from "../../lib/utils";
 
 /** Plays the result straight from the BFF download route; Range requests make seeking work. */
 const OutputPlayer = ({ job }: { job: Job }) => {
   if (!job.output.downloadUrl) return null;
-  const src = apiUrl(job.output.downloadUrl);
+  const src = withAuthQuery(apiUrl(job.output.downloadUrl));
 
   return (
     <section className="overflow-hidden rounded-2xl border border-line bg-panel">
@@ -19,7 +20,7 @@ const OutputPlayer = ({ job }: { job: Job }) => {
           </p>
         </div>
         <a
-          href={`${src}?attachment=1`}
+          href={`${src}&attachment=1`}
           className="flex items-center gap-2 rounded-lg bg-flow px-3.5 py-2 text-sm font-medium text-canvas hover:bg-flow-strong"
         >
           <Download className="size-4" strokeWidth={1.75} />

@@ -1,5 +1,6 @@
 import { EventStreamContentType, fetchEventSource } from "@microsoft/fetch-event-source";
 import { apiUrl } from "../../lib/axios";
+import { authHeaders } from "../../lib/identity";
 import type { JobChangeEvent } from "../../interface/Job";
 
 /**
@@ -43,6 +44,7 @@ export const connectJobStream = ({ onLive, onJobsChanged, onStateChange }: Handl
 
     void fetchEventSource(apiUrl("/api/jobs/stream"), {
       signal: controller.signal,
+      headers: authHeaders(),
       openWhenHidden: true,
       async onopen(response) {
         if (response.ok && response.headers.get("content-type")?.startsWith(EventStreamContentType)) {

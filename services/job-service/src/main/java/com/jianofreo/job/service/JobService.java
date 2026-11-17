@@ -66,7 +66,7 @@ public class JobService {
                 media.getFileName(), media.getPath(), media.getFps(), media.getFpsValue(),
                 media.getWidth(), media.getHeight(), media.getFrameCount(), media.getDurationMs(),
                 media.getHasAudio(), media.getSizeBytes(), null,
-                plans.size(), 0, now, now, null, null, preprocess);
+                plans.size(), 0, now, now, null, null, preprocess, request.getOwnerId());
         Job saved = jobRepository.save(job);
 
         List<JobChunk> chunks = new ArrayList<>();
@@ -90,11 +90,11 @@ public class JobService {
         return JobMapper.toResponse(saved);
     }
 
-    public List<JobResponse> listJobs(int limit, boolean activeOnly) {
+    public List<JobResponse> listJobs(String ownerId, int limit, boolean activeOnly) {
         PageRequest page = PageRequest.of(0, Math.max(1, Math.min(200, limit)));
         List<Job> jobs = activeOnly
-                ? jobRepository.findByStatusInOrderByIdDesc(ACTIVE, page)
-                : jobRepository.findAllByOrderByIdDesc(page);
+                ? jobRepository.findByOwnerIdAndStatusInOrderByIdDesc(ownerId, ACTIVE, page)
+                : jobRepository.findByOwnerIdOrderByIdDesc(ownerId, page);
         return jobs.stream().map(JobMapper::toResponse).toList();
     }
 
@@ -146,8 +146,18 @@ public class JobService {
         jobChunkRepository.deleteByJob_Id(id);
         jobRepository.deleteById(id);
         progressTracker.clear(id);
-        messagePublisher.publishJobDeleted(id);
+        messagePublisher.publishJobDeleted(id, job.getOwnerId());
         log.info("job_deleted id={}", id);
+    }
+
+    /** Moves the jobs of a guest browser to the account that just signed up or logged in. */
+    public int claimJobs(String from, String to) {
+        if (!from.startsWith("g:") || !to.startsWith("u:")) {
+            throw ApiException.badRequest("Only guest jobs can be moved to an account");
+        }
+        int moved = jobRepository.reassignOwner(from, to);
+        log.info("jobs_claimed moved={}", moved);
+        return moved;
     }
 
     Job findJob(Integer id) {

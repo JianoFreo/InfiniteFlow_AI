@@ -42,4 +42,5 @@ public class JobResponse {
     private Instant finishedAt;
 
     private String preprocess;
+    private String ownerId;
 }

@@ -20,6 +20,7 @@ interface ServiceJobEvent {
   progress: number;
   completedChunks: number;
   totalChunks: number;
+  ownerId?: string;
 }
 
 export const isRabbitConnected = () => connected;
@@ -40,12 +41,14 @@ export const startJobEventListener = async (): Promise<void> => {
         if (!msg) return;
         try {
           const event = JSON.parse(msg.content.toString()) as ServiceJobEvent;
+          if (!event.ownerId) return; // unowned events cannot be routed to anyone
           publishJobChange({
             id: event.jobId,
             status: event.status.toLowerCase(),
             progress: event.progress ?? 0,
             completedChunks: event.completedChunks ?? 0,
             totalChunks: event.totalChunks ?? 0,
+            ownerId: event.ownerId,
           });
         } catch {
           console.warn("[bff] ignored malformed job event");

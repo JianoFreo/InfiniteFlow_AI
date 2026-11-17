@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import { jobService } from "../../clients/jobService.client.js";
 import { mediaService } from "../../clients/mediaService.client.js";
+import type { Identity } from "../../middlewares/identity.middleware.js";
 import type { JobOptions } from "../../middlewares/validateJobOptions.middleware.js";
 import { forwardServiceError } from "../../utils/forwardServiceError.js";
 import { toJobView } from "../../utils/toJobView.js";
@@ -17,6 +18,7 @@ export const addJob = async (
   res: Response<dto.addJob.response | dto.addJob.error>,
 ) => {
   const { factor, mode, preprocess }: JobOptions = res.locals.jobOptions;
+  const identity: Identity = res.locals.identity;
   const contentType = req.headers["content-type"];
   if (!contentType?.startsWith("multipart/form-data")) {
     return res.status(400).json({ message: "Upload the video as multipart/form-data with a 'file' field" });
@@ -31,7 +33,7 @@ export const addJob = async (
   }
 
   try {
-    const job = await jobService.createJob({ sourceMediaId: mediaId, factor, mode, preprocess });
+    const job = await jobService.createJob({ sourceMediaId: mediaId, factor, mode, preprocess, ownerId: identity.owner });
     return res.status(201).json({ message: "Job created", job: toJobView(job) });
   } catch (err) {
     await mediaService.deleteMedia(mediaId).catch(() => undefined);

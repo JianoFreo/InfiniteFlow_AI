@@ -1,6 +1,7 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import type { JobMode, PreprocessStep } from "../../interface/Job";
+import { useSettings } from "../../lib/settings";
 import DropZone from "./UploadForm/DropZone";
 import FactorSlider from "./UploadForm/FactorSlider";
 import ModeToggle from "./UploadForm/ModeToggle";
@@ -18,12 +19,18 @@ interface UploadFormProps {
 
 const UploadForm = ({ onSubmit }: UploadFormProps) => {
   const [file, setFile] = useState<File | null>(null);
-  const [factor, setFactor] = useState(4);
-  const [mode, setMode] = useState<JobMode>("flow");
-  const [preprocess, setPreprocess] = useState<PreprocessStep[]>([]);
+  const { settings } = useSettings();
+  const [factor, setFactor] = useState(settings.defaultFactor);
+  const [mode, setMode] = useState<JobMode>(settings.defaultMode);
+  const [preprocess, setPreprocess] = useState<PreprocessStep[]>(settings.defaultPreprocess);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState({ loaded: 0, total: 0, bytesPerSecond: 0 });
   const startedAt = useRef(0);
+
+  // Changing the defaults in Settings updates the form straight away
+  useEffect(() => setFactor(settings.defaultFactor), [settings.defaultFactor]);
+  useEffect(() => setMode(settings.defaultMode), [settings.defaultMode]);
+  useEffect(() => setPreprocess(settings.defaultPreprocess), [settings.defaultPreprocess]);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();

@@ -3,10 +3,12 @@ import { deleteJob } from "../controllers/job/deleteRequests.controller.js";
 import { downloadJob, getJob, getJobs } from "../controllers/job/getRequests.controller.js";
 import { addJob } from "../controllers/job/postRequests.controller.js";
 import { cancelJob } from "../controllers/job/updateRequests.controller.js";
+import { identify } from "../middlewares/identity.middleware.js";
 import { validateJobId, validateJobOptions } from "../middlewares/validateJobOptions.middleware.js";
 import { streamJobs } from "../services/job-sse/index.js";
 
 const router = Router();
+router.use(identify);
 
 // GET
 router.get("/", getJobs);

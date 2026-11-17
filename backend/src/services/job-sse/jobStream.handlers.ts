@@ -1,4 +1,5 @@
 import type { Request, Response } from "express";
+import type { Identity } from "../../middlewares/identity.middleware.js";
 import { addScreen, hasCapacity, removeScreen } from "./jobStream.hub.js";
 
 /** GET /api/jobs/stream */
@@ -16,7 +17,7 @@ export const streamJobs = (req: Request, res: Response) => {
 
   res.write("retry: 3000\n\n");
   res.write(`event: ready\ndata: ${JSON.stringify({ at: Date.now() })}\n\n`);
-  addScreen(res);
+  addScreen(res, (res.locals.identity as Identity).owner);
 
   req.on("close", () => removeScreen(res));
 };

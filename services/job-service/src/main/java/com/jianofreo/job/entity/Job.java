@@ -62,4 +62,8 @@ public class Job {
 
     /** Comma-separated pre-processing steps applied to every frame before interpolation, or null. */
     private String preprocess;
+
+    /** Who owns the job: "u:<userId>" for an account, "g:<guestId>" for a guest browser. */
+    @Column(length = 64)
+    private String ownerId;
 }

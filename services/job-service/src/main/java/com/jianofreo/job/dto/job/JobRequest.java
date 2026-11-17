@@ -2,7 +2,9 @@ package com.jianofreo.job.dto.job;
 
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import jakarta.validation.constraints.Pattern;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -27,4 +29,9 @@ public class JobRequest {
     /** Optional comma-separated clean-up steps run on every frame before interpolation: denoise, deband, sharpen. */
     @Pattern(regexp = "^(denoise|deband|sharpen)(,(denoise|deband|sharpen))*$", message = "must be a comma-separated list of denoise, deband, sharpen")
     private String preprocess;
+
+    /** Set by the BFF: "u:<userId>" or "g:<guestId>". */
+    @NotBlank
+    @Size(max = 64)
+    private String ownerId;
 }

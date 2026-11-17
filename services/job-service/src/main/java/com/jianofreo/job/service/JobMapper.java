@@ -22,7 +22,7 @@ final class JobMapper {
                 job.getWidth(), job.getHeight(), job.getFrameCount(), outputFrames,
                 job.getDurationMs(), job.getHasAudio(), job.getSourceSizeBytes(), job.getOutputSizeBytes(),
                 job.getTotalChunks(), job.getCompletedChunks(),
-                job.getCreatedAt(), job.getUpdatedAt(), job.getStartedAt(), job.getFinishedAt(), job.getPreprocess());
+                job.getCreatedAt(), job.getUpdatedAt(), job.getStartedAt(), job.getFinishedAt(), job.getPreprocess(), job.getOwnerId());
     }
 
     static ChunkResponse toResponse(JobChunk chunk, int framesDone) {
