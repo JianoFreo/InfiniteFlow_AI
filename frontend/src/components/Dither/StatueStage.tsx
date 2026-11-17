@@ -34,14 +34,14 @@ void main() {
 `;
 
 interface StatueStageProps {
-  modelUrl: string;
+  modelUrls: string[];
 }
 
 /**
- * One fixed, full-viewport WebGL canvas behind the page. A real 3D marble statue scan is lit by a moving light
+ * One fixed, full-viewport WebGL canvas behind the page. Real 3D sculpture scans (one per page section) are lit by a moving light
  * and turned by page scroll (true 3D rotation, with parallax drift left/right), then dithered in a shader.
  */
-const StatueStage = ({ modelUrl }: StatueStageProps) => {
+const StatueStage = ({ modelUrls }: StatueStageProps) => {
   const hostRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -64,27 +64,36 @@ const StatueStage = ({ modelUrl }: StatueStageProps) => {
     rim.position.set(-3, 1, -2);
     scene.add(key, rim, new THREE.AmbientLight(0xffffff, 0.35));
 
-    const pivot = new THREE.Group();
-    scene.add(pivot);
+    // One pivot per statue; the page scroll picks which one is on stage.
+    const pivots: Array<{ group: THREE.Group; base: number }> = modelUrls.map(() => ({ group: new THREE.Group(), base: 0 }));
+    pivots.forEach(({ group }) => {
+      group.visible = false;
+      scene.add(group);
+    });
 
     const draco = new DRACOLoader().setDecoderPath("/draco/");
     const loader = new GLTFLoader().setDRACOLoader(draco);
-    loader.load(modelUrl, (gltf) => {
-      const model = gltf.scene;
-      model.traverse((obj) => {
-        const mesh = obj as THREE.Mesh;
-        if (!mesh.isMesh) return;
-        const old = mesh.material as THREE.MeshStandardMaterial;
-        mesh.material = new THREE.MeshStandardMaterial({ color: 0xefece4, roughness: 0.6, metalness: 0, normalMap: old.normalMap ?? null });
+    modelUrls.forEach((url, i) => {
+      loader.load(url, (gltf) => {
+        const model = gltf.scene;
+        model.traverse((obj) => {
+          const mesh = obj as THREE.Mesh;
+          if (!mesh.isMesh) return;
+          const old = mesh.material as THREE.MeshStandardMaterial;
+          mesh.material = new THREE.MeshStandardMaterial({ color: 0xefece4, roughness: 0.6, metalness: 0, normalMap: old.normalMap ?? null });
+        });
+        // centre, and fit inside a ~2.8-unit box whatever the model's own units are
+        const box = new THREE.Box3().setFromObject(model);
+        const size = box.getSize(new THREE.Vector3());
+        model.position.sub(box.getCenter(new THREE.Vector3()));
+        pivots[i].base = 2.8 / Math.max(size.x, size.y, size.z);
+        pivots[i].group.add(model);
       });
-      // centre and normalise to ~2.8 units tall
-      const box = new THREE.Box3().setFromObject(model);
-      const size = box.getSize(new THREE.Vector3());
-      const center = box.getCenter(new THREE.Vector3());
-      model.position.sub(center);
-      pivot.scale.setScalar(2.8 / size.y);
-      pivot.add(model);
     });
+    const smooth = (a: number, b: number, x: number) => {
+      const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
+      return t * t * (3 - 2 * t);
+    };
 
     // offscreen lit render -> dither pass
     const target = new THREE.WebGLRenderTarget(1, 1, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
@@ -147,8 +156,18 @@ const StatueStage = ({ modelUrl }: StatueStageProps) => {
       rotX += (targetRotX - rotX) * 0.08;
       posX += (targetX - posX) * 0.06;
       posY += (targetY - posY) * 0.06;
-      pivot.rotation.set(rotX, rotY, 0);
-      pivot.position.set(posX, posY + Math.sin(t * 0.8) * 0.04, 0);
+      // statue i is on stage for its slice of the page; it grows in and shrinks out at the seams
+      const n = pivots.length;
+      const slot = Math.min(n - 1, Math.floor(s * n));
+      const u = s * n - slot;
+      const ease = smooth(0, 0.16, u) * (1 - smooth(0.84, 1, u));
+      pivots.forEach(({ group, base }, i) => {
+        const k = i === slot && base > 0 ? ease : 0;
+        group.visible = k > 0.01;
+        group.scale.setScalar(Math.max(0.0001, base * k));
+        group.rotation.set(rotX, rotY + i * 1.3, 0);
+        group.position.set(posX, posY + Math.sin(t * 0.8) * 0.04, 0);
+      });
 
       // slowly orbiting light so the scan's surface detail keeps shifting
       key.position.set(Math.cos(t * 0.6) * 3, 2, Math.sin(t * 0.6) * 3 + 1.5);
@@ -173,7 +192,8 @@ const StatueStage = ({ modelUrl }: StatueStageProps) => {
       renderer.dispose();
       host.removeChild(renderer.domElement);
     };
-  }, [modelUrl]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modelUrls.join("|")]);
 
   return <div ref={hostRef} aria-hidden className="pointer-events-none fixed inset-0 z-[1] opacity-[0.5]" />;
 };

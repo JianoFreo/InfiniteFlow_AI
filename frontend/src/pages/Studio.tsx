@@ -19,6 +19,14 @@ import JobDetailsPage from "./JobDetailsPage";
 import QueuePage from "./QueuePage";
 import UploadPage from "./UploadPage";
 
+const STATUE_MODELS = [
+  "/models/statue.glb",
+  "/models/statue-lincoln.glb",
+  "/models/statue-waterson.glb",
+  "/models/statue-dancer.glb",
+  "/models/statue-rutherford.glb",
+];
+
 type Page = "upload" | "queue" | "job";
 const PAGES: Page[] = ["upload", "queue", "job"];
 const DETAIL_REFRESH_MS = 1000;
@@ -247,7 +255,7 @@ const Studio = () => {
   return (
     <div className="relative flex min-h-full">
       <DitherField />
-      {page === "upload" && <StatueStage modelUrl="/models/statue.glb" />}
+      {page === "upload" && <StatueStage modelUrls={STATUE_MODELS} />}
       <SideBar
         navItems={navItems}
         activePage={page === "job" ? "queue" : page}
