@@ -32,13 +32,6 @@ Hand-written optical-flow engine powered by **Python + NumPy**. No pretrained mo
   />
 
   <img
-    width="700"
-    alt="Recording 2026-11-18 034948"
-    src="https://github.com/user-attachments/assets/45626e06-31a1-4f8b-86c0-6dffecf6c807"
-    style="display: block; margin-bottom: 20px;"
-  />
-
-  <img
     width="90%"
     src="https://github.com/user-attachments/assets/198c65e8-cfb6-483f-897a-cabd98f1dc0d"
     alt="InfiniteFlow AI video interpolation preview"
