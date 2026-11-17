@@ -1,4 +1,3 @@
-import { Sparkles } from "lucide-react";
 import { useRef, useState } from "react";
 import type { FormEvent } from "react";
 import type { JobMode, PreprocessStep } from "../../interface/Job";
@@ -46,7 +45,7 @@ const UploadForm = ({ onSubmit }: UploadFormProps) => {
   };
 
   return (
-    <form onSubmit={submit} className="space-y-6 rounded-2xl border border-line bg-panel p-5 sm:p-6">
+    <form onSubmit={submit} className="space-y-6 rounded-xl border border-line bg-panel p-5 sm:p-6">
       <DropZone file={file} disabled={uploading} onFile={setFile} />
       <FactorSlider value={factor} disabled={uploading} onChange={setFactor} />
       <ModeToggle value={mode} disabled={uploading} onChange={setMode} />
@@ -55,10 +54,9 @@ const UploadForm = ({ onSubmit }: UploadFormProps) => {
       <button
         type="submit"
         disabled={!file || uploading}
-        className="flex w-full items-center justify-center gap-2 rounded-xl bg-flow px-4 py-3 text-sm font-semibold text-canvas transition-colors hover:bg-flow-strong disabled:cursor-not-allowed disabled:bg-line disabled:text-ink-faint"
+        className="flex w-full items-center justify-center gap-2 rounded-lg bg-flow px-4 py-2.5 text-sm font-medium text-canvas transition-colors hover:bg-flow-strong disabled:cursor-not-allowed disabled:bg-line disabled:text-ink-faint"
       >
-        <Sparkles className="size-4" />
-        {uploading ? "Uploading…" : `Interpolate at ${factor}×`}
+        {uploading ? "Uploading…" : `Create ${factor}× video`}
       </button>
     </form>
   );

@@ -15,7 +15,7 @@ const UploadProgress = ({ loaded, total, bytesPerSecond }: UploadProgressProps) 
         <span className="text-ink-dim">
           {finishing ? "Reading video info (fps, frames)…" : `Uploading ${formatBytes(loaded)} of ${formatBytes(total)}`}
         </span>
-        <span className="font-mono text-ink">{finishing ? "" : `${formatBytes(bytesPerSecond)}/s · ${percent}%`}</span>
+        <span className="text-ink">{finishing ? "" : `${formatBytes(bytesPerSecond)}/s · ${percent}%`}</span>
       </div>
       <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-line">
         <div

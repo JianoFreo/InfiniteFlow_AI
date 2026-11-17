@@ -60,7 +60,7 @@ const SideBar = ({ jobs, loaded, activeJobId, onNewVideo, onOpenJob, onDeleteJob
         <button
           onClick={onNewVideo}
           className={cn(
-            "flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors hover:bg-panel-2",
+            "flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors hover:bg-panel-2",
             activeJobId == null && "bg-panel-2",
           )}
         >

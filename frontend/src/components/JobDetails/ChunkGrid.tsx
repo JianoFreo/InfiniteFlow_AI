@@ -40,7 +40,7 @@ const ChunkGrid = ({ chunks }: { chunks: Chunk[] }) => {
                 className={cn("absolute inset-y-0 left-0 transition-[width] duration-500", chunk.status === "processing" && "progress-active")}
                 style={{ width: `${pct}%`, background: color, opacity: chunk.status === "completed" ? 0.85 : 0.6 }}
               />
-              <span className="absolute inset-0 grid place-items-center font-mono text-[10px] text-ink mix-blend-difference">
+              <span className="absolute inset-0 grid place-items-center text-[10px] text-ink mix-blend-difference">
                 {chunk.index}
               </span>
             </div>
@@ -51,7 +51,7 @@ const ChunkGrid = ({ chunks }: { chunks: Chunk[] }) => {
       {workers.length > 0 && (
         <ul className="mt-4 flex flex-wrap gap-x-4 gap-y-1.5">
           {workers.map((worker) => (
-            <li key={worker} className="flex items-center gap-1.5 font-mono text-xs text-ink-dim">
+            <li key={worker} className="flex items-center gap-1.5 text-xs text-ink-dim">
               <span className="size-2.5 rounded-sm" style={{ background: workerColor(worker) }} />
               {worker}
             </li>

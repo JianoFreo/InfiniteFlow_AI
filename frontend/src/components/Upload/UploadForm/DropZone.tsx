@@ -32,7 +32,7 @@ const DropZone = ({ file, disabled, onFile }: DropZoneProps) => {
 
   if (file && preview) {
     return (
-      <div className="overflow-hidden rounded-2xl border border-line bg-canvas">
+      <div className="overflow-hidden rounded-xl border border-line bg-canvas">
         <video
           src={preview}
           className="aspect-video w-full bg-black object-contain"
@@ -45,7 +45,7 @@ const DropZone = ({ file, disabled, onFile }: DropZoneProps) => {
           }}
         />
         <div className="flex items-center gap-3 p-3">
-          <FileVideo className="size-5 shrink-0 text-flow" />
+          <FileVideo className="size-5 shrink-0 text-ink-dim" />
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium">{file.name}</p>
             <p className="text-xs text-ink-faint">
@@ -82,16 +82,14 @@ const DropZone = ({ file, disabled, onFile }: DropZoneProps) => {
         pick(event.dataTransfer.files);
       }}
       className={cn(
-        "flex w-full flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed px-6 py-14 text-center transition-colors",
-        dragging ? "border-flow bg-flow/8" : "border-line-strong hover:border-flow/60 hover:bg-panel-2/50",
+        "flex w-full flex-col items-center justify-center gap-3 rounded-xl border px-6 py-12 text-center transition-colors",
+        dragging ? "border-ink-dim bg-panel-2" : "border-line-strong hover:bg-panel-2/60",
       )}
     >
-      <span className="grid size-14 place-items-center rounded-2xl bg-flow/12 text-flow">
-        <UploadCloud className="size-7" />
-      </span>
+      <UploadCloud className="size-6 text-ink-dim" />
       <div>
-        <p className="font-medium">Drop a video here, or click to browse</p>
-        <p className="mt-1 text-sm text-ink-faint">MP4, MOV, MKV, WebM · up to 4 GB</p>
+        <p className="text-sm font-medium">Drop a video here, or click to browse</p>
+        <p className="mt-1 text-xs text-ink-faint">MP4, MOV, MKV, WebM · up to 4 GB</p>
       </div>
       <input
         ref={inputRef}

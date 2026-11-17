@@ -35,8 +35,8 @@ const PreprocessOptions = ({ value, disabled, onChange }: PreprocessOptionsProps
               aria-pressed={on}
               title={description}
               className={cn(
-                "flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm transition-colors disabled:opacity-50",
-                on ? "border-flow bg-flow text-canvas" : "border-line-strong text-ink-dim hover:bg-panel-2 hover:text-ink",
+                "flex items-center gap-1.5 rounded-lg border px-3.5 py-1.5 text-sm transition-colors disabled:opacity-50",
+                on ? "border-ink-dim bg-panel-2 text-ink" : "border-line-strong text-ink-dim hover:bg-panel-2 hover:text-ink",
               )}
             >
               {on && <Check className="size-3.5" />}

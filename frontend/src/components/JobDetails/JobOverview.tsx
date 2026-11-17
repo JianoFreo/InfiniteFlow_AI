@@ -1,4 +1,3 @@
-import { Clock, Gauge, Layers, MonitorPlay } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { JobDetail } from "../../interface/Job";
 import { isActive } from "../../interface/Job";
@@ -46,7 +45,7 @@ const JobOverview = ({ job }: { job: JobDetail }) => {
       <div className="flex flex-wrap items-center gap-3">
         <StatusBadge status={job.status} />
         <p className="text-sm text-ink-dim">{STAGE_TEXT[job.status]}</p>
-        <span className="ml-auto font-mono text-3xl font-semibold">{job.progress}%</span>
+        <span className="ml-auto text-2xl font-semibold">{job.progress}%</span>
       </div>
       <div className="mt-3">
         <ProgressBar value={job.progress} status={job.status} size="lg" />
@@ -57,25 +56,21 @@ const JobOverview = ({ job }: { job: JobDetail }) => {
 
       <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatTile
-          icon={MonitorPlay}
           label="Source"
           value={`${formatFps(job.source.fps)} fps`}
           detail={`${job.source.width}×${job.source.height} · ${formatNumber(job.source.frameCount)} frames`}
         />
         <StatTile
-          icon={Layers}
           label="Output"
           value={`${formatFps(job.output.fps)} fps`}
           detail={`${formatNumber(job.output.frameCount)} frames · ${job.mode === "flow" ? "optical flow" : "blend"}${job.preprocess.length ? ` · ${job.preprocess.join(" + ")}` : ""}`}
         />
         <StatTile
-          icon={Gauge}
           label="Speed"
           value={speed != null ? `${speed.toFixed(1)} fr/s` : "-"}
           detail={realtime != null ? `${realtime.toFixed(2)}× real time` : "source frames per second"}
         />
         <StatTile
-          icon={Clock}
           label={running ? "Elapsed" : "Total time"}
           value={formatDuration(elapsedMs)}
           detail={`video length ${formatDuration(job.source.durationMs)}`}

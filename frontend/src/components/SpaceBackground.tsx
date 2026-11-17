@@ -51,7 +51,7 @@ const SpaceBackground = ({ intensity }: SpaceBackgroundProps) => {
     const meteors: Meteor[] = [];
     let raf = 0;
     let last = 0;
-    let spawn = 0.95; // a shooting star right away
+    let spawn = 0; // a shooting star right away
 
     const makeStar = (onBand: boolean): Star => {
       let x: number;
@@ -110,7 +110,7 @@ const SpaceBackground = ({ intensity }: SpaceBackgroundProps) => {
       }
 
       if (reduced) return;
-      spawn += dt * (0.12 + level.current * 0.22);
+      spawn += 0 * level.current * dt;
       while (spawn >= 1) {
         spawn -= 1;
         const speed = 150 + Math.random() * 170;
