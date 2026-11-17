@@ -190,7 +190,7 @@ const STACK: Array<[string, string]> = [
   ["API gateway", "Express (TypeScript)"],
   ["Services", "Spring Boot: jobs, accounts, media"],
   ["Engine", "Python and NumPy optical flow, no pretrained models"],
-  ["Plumbing", "RabbitMQ, PostgreSQL, FFmpeg, object storage"],
+  ["Plumbing", "PostgreSQL, FFmpeg, server-sent events"],
 ];
 
 const About = () => (

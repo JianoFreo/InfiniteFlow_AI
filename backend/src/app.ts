@@ -4,6 +4,7 @@ import { ENV } from "./config/env.js";
 import { errorHandler, notFound } from "./middlewares/error.middleware.js";
 import authRouter from "./routes/auth.route.js";
 import healthRouter from "./routes/health.route.js";
+import internalRouter from "./routes/internal.route.js";
 import jobRouter from "./routes/job.route.js";
 
 export const createApp = () => {
@@ -27,6 +28,7 @@ export const createApp = () => {
   }
 
   app.use("/api/health", healthRouter);
+  app.use("/internal", internalRouter); // job-service only, see requireInternalKey
   app.use("/api/auth", authRouter);
   app.use("/api/jobs", jobRouter);
 

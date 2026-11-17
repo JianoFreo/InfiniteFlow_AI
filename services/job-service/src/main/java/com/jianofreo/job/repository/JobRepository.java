@@ -14,6 +14,10 @@ import java.util.List;
 
 public interface JobRepository extends JpaRepository<Job, Integer> {
 
+    long countByOwnerIdAndStatusIn(String ownerId, Collection<JobStatus> statuses);
+
+    List<Job> findByStatusIn(Collection<JobStatus> statuses);
+
     List<Job> findByOwnerIdOrderByIdDesc(String ownerId, Pageable pageable);
 
     List<Job> findByOwnerIdAndStatusInOrderByIdDesc(String ownerId, Collection<JobStatus> statuses, Pageable pageable);

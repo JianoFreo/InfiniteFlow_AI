@@ -6,17 +6,18 @@ import com.jianofreo.job.dto.job.ChunkResponse;
 import com.jianofreo.job.dto.job.JobRequest;
 import com.jianofreo.job.dto.job.JobResponse;
 import com.jianofreo.job.dto.media.MediaResponse;
-import com.jianofreo.job.dto.message.ChunkTask;
+import com.jianofreo.job.dto.engine.ChunkTask;
 import com.jianofreo.job.entity.ChunkStatus;
 import com.jianofreo.job.entity.Job;
 import com.jianofreo.job.entity.JobChunk;
 import com.jianofreo.job.entity.JobStatus;
 import com.jianofreo.job.exception.ApiException;
-import com.jianofreo.job.messaging.MessagePublisher;
 import com.jianofreo.job.repository.JobChunkRepository;
 import com.jianofreo.job.repository.JobRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
@@ -37,7 +38,8 @@ public class JobService {
     private final JobRepository jobRepository;
     private final JobChunkRepository jobChunkRepository;
     private final MediaClient mediaClient;
-    private final MessagePublisher messagePublisher;
+    private final JobEventPublisher jobEventPublisher;
+    private final JobRunner jobRunner;
     private final ProgressTracker progressTracker;
     private final AppProperties props;
 
@@ -45,9 +47,11 @@ public class JobService {
      * 1. ask media-service what the source video is (fps, frames, size)
      * 2. plan frame-range chunks
      * 3. save job + chunks
-     * 4. put one message per chunk on interp.chunks: every idle engine replica grabs one
+     * 4. hand the chunks to the JobRunner: free engine threads start on them right away
      */
     public JobResponse createJob(JobRequest request) {
+        rejectIfTooManyRunning(request.getOwnerId()); // before any work: a rejected request costs nothing
+
         MediaResponse media;
         try {
             media = mediaClient.getMedia(request.getSourceMediaId());
@@ -77,17 +81,46 @@ public class JobService {
         jobChunkRepository.saveAll(chunks);
         progressTracker.seed(saved.getId(), chunks);
 
+        List<ChunkTask> tasks = new ArrayList<>();
         for (ChunkPlanner.ChunkPlan plan : plans) {
-            messagePublisher.publishChunk(new ChunkTask(saved.getId(), plan.index(), media.getPath(),
+            tasks.add(new ChunkTask(saved.getId(), plan.index(), media.getPath(),
                     plan.startFrame(), plan.frameCount(), plan.last(), saved.getFactor(), mode,
                     media.getFps(), media.getWidth(), media.getHeight(), chunkOutputPath(saved.getId(), plan.index()), preprocess));
         }
-        messagePublisher.publishJobChanged(saved);
+        jobRunner.start(tasks);
+        jobEventPublisher.publishJobChanged(saved);
 
         log.info("job_created id={} file={} frames={} factor={} mode={} chunks={}x{}f",
                 saved.getId(), saved.getFileName(), saved.getFrameCount(), saved.getFactor(), mode,
                 plans.size(), framesPerChunk);
         return JobMapper.toResponse(saved);
+    }
+
+    /** Guests may run one video at a time; signed-in users several side by side. */
+    private void rejectIfTooManyRunning(String ownerId) {
+        boolean guest = ownerId.startsWith("g:");
+        int limit = guest ? props.maxActiveGuestJobs() : props.maxActiveUserJobs();
+        if (jobRepository.countByOwnerIdAndStatusIn(ownerId, ACTIVE) >= limit) {
+            throw ApiException.conflict(guest
+                    ? "You already have a video processing. Wait for it to finish, or sign up to run several at once."
+                    : "You already have " + limit + " videos processing. Wait for one to finish.");
+        }
+    }
+
+    /**
+     * The engine runs inside this process, so a restart loses the work in flight. Mark those jobs as failed
+     * on startup instead of leaving them "processing" forever.
+     */
+    @EventListener(ApplicationReadyEvent.class)
+    public void failInterruptedJobs() {
+        for (Job job : jobRepository.findByStatusIn(ACTIVE)) {
+            job.setStatus(JobStatus.FAILED);
+            job.setErrorMessage("Interrupted by a restart. Please upload the video again.");
+            job.setFinishedAt(Instant.now());
+            job.setUpdatedAt(Instant.now());
+            jobRepository.save(job);
+            log.warn("job_interrupted id={}", job.getId());
+        }
     }
 
     public List<JobResponse> listJobs(String ownerId, int limit, boolean activeOnly) {
@@ -123,8 +156,8 @@ public class JobService {
             job.setUpdatedAt(Instant.now());
             try {
                 Job saved = jobRepository.save(job);
-                messagePublisher.publishCancel(id);
-                messagePublisher.publishJobChanged(saved);
+                jobRunner.cancel(id);
+                jobEventPublisher.publishJobChanged(saved);
                 progressTracker.clear(id);
                 mediaClient.deleteWorkdirQuietly(id);
                 log.info("job_cancelled id={}", id);
@@ -138,7 +171,7 @@ public class JobService {
     public void deleteJob(Integer id) {
         Job job = findJob(id);
         if (!job.getStatus().isTerminal()) {
-            messagePublisher.publishCancel(id);
+            jobRunner.cancel(id);
         }
         mediaClient.deleteMediaQuietly(job.getSourceMediaId());
         mediaClient.deleteMediaQuietly(job.getOutputMediaId());
@@ -146,7 +179,7 @@ public class JobService {
         jobChunkRepository.deleteByJob_Id(id);
         jobRepository.deleteById(id);
         progressTracker.clear(id);
-        messagePublisher.publishJobDeleted(id, job.getOwnerId());
+        jobEventPublisher.publishJobDeleted(id, job.getOwnerId());
         log.info("job_deleted id={}", id);
     }
 

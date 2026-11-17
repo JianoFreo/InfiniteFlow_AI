@@ -203,7 +203,7 @@ const Studio = () => {
         onUploadProgress: (event) => onProgress({ loaded: event.loaded, total: event.total ?? file.size }),
       });
       setJobs((prev) => [data.job, ...prev.filter((job) => job.id !== data.job.id)]);
-      notify("ok", `Job #${data.job.id} queued in ${data.job.chunks.total} chunks`);
+      notify("ok", `Started job #${data.job.id} (${data.job.chunks.total} chunks)`);
       navigate("job", data.job.id);
     } catch (err) {
       notify("bad", errorMessage(err, "Upload failed"));

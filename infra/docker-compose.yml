@@ -1,13 +1,14 @@
-# InfiniteFlow: BFF + 3 Java microservices. Python is only the AI math, run by the Java worker.
+# InfiniteFlow: a BFF + 2 Java microservices. Python is only the AI math, run by job-service.
 #
 #   browser ─► frontend (nginx :8080) ─► backend / BFF (:5000)
 #                                          ├─► job-service   (Spring, :8081) ─► jobs_db
 #                                          └─► media-service (Spring, :8082) ─► media_db + /data
-#   job-service ─(RabbitMQ)─► interpolation-worker × N (Spring) ─(RabbitMQ)─► job-service ─► BFF ─(SSE)─► browser
-#                                  └─ per chunk: python -m app.run_chunk  (NumPy math, stdin/stdout only)
+#   job-service splits a video into chunks and runs them on its own thread pool:
+#                                          └─ per chunk: python -m app.run_chunk  (NumPy math, stdin/stdout only)
+#   job-service ─(HTTP, after every change)─► BFF ─(SSE)─► browser     live progress, no polling
 #
 # Run from the repo root:   docker compose -f infra/docker-compose.yml up --build
-# More worker replicas:     docker compose -f infra/docker-compose.yml up -d --scale interpolation-worker=4
+# Faster videos:            raise ENGINE_THREADS under job-service (chunks processed at the same time)
 
 name: infiniteflow
 
@@ -32,17 +33,6 @@ services:
       timeout: 5s
       retries: 20
 
-  rabbitmq:
-    image: rabbitmq:4-management-alpine
-    ports:
-      - "15672:15672" # management UI: http://localhost:15672 (guest / guest)
-    healthcheck:
-      # check_port_connectivity waits until the AMQP port accepts connections (ping passes earlier)
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity"]
-      interval: 5s
-      timeout: 10s
-      retries: 30
-
   media-service:
     build: ../services/media-service
     environment:
@@ -61,17 +51,28 @@ services:
     restart: unless-stopped
 
   job-service:
-    build: ../services/job-service
+    build:
+      context: ../services          # needs both job-service/ (Java) and interpolation-engine/ (Python)
+      dockerfile: job-service/Dockerfile
     environment:
       DB_URL: jdbc:postgresql://postgres:5432/jobs_db?user=app&password=app
-      RABBITMQ_HOST: rabbitmq
       MEDIA_SERVICE_URL: http://media-service:8082
       FILE_ROOT: /data
       CHUNK_SECONDS: "2"
+      # Live updates: job-service pushes every change to the BFF, which shows it in open browsers
+      BFF_EVENTS_URL: http://backend:5000/internal/job-events
+      INTERNAL_KEY: ${INTERNAL_KEY:-change-me-too}
+      # How many chunks the Python engine processes at the same time. Raise it on a bigger machine.
+      ENGINE_THREADS: "2"
+      MAX_ACTIVE_GUEST_JOBS: "1"
+      MAX_ACTIVE_USER_JOBS: "5"
+      # Read by the Python engine (inherited by the child process)
+      FLOW_PRESET: medium
+      FLOW_MAX_SIDE: "640"
+    volumes:
+      - data:/data
     depends_on:
       postgres:
-        condition: service_healthy
-      rabbitmq:
         condition: service_healthy
       media-service:
         condition: service_healthy
@@ -82,30 +83,6 @@ services:
       retries: 40
     restart: unless-stopped
 
-  interpolation-worker:
-    build:
-      context: ../services          # needs both interpolation-worker/ (Java) and interpolation-engine/ (Python)
-      dockerfile: interpolation-worker/Dockerfile
-    environment:
-      RABBITMQ_HOST: rabbitmq
-      JOB_SERVICE_URL: http://job-service:8081
-      # Read by the Python engine (inherited by the child process)
-      FLOW_PRESET: medium
-      FLOW_MAX_SIDE: "640"
-    volumes:
-      - data:/data
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-fs", "http://localhost:8083/actuator/health"]
-      interval: 5s
-      timeout: 5s
-      retries: 40
-    deploy:
-      replicas: 2
-    restart: unless-stopped
-
   backend:
     build: ../backend
     environment:
@@ -113,7 +90,7 @@ services:
       NODE_ENV: production
       JOB_SERVICE_URL: http://job-service:8081
       MEDIA_SERVICE_URL: http://media-service:8082
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      INTERNAL_KEY: ${INTERNAL_KEY:-change-me-too}
       AUTH_SECRET: ${AUTH_SECRET:-change-me-before-going-public}
       CORS_ORIGIN: http://localhost:8080,http://localhost:5173
     ports:

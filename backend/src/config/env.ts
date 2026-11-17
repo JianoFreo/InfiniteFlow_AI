@@ -9,7 +9,8 @@ export const ENV = {
   AUTH_SECRET: process.env.AUTH_SECRET ?? "dev-only-secret-change-me",
   JOB_SERVICE_URL: process.env.JOB_SERVICE_URL ?? "http://localhost:8081",
   MEDIA_SERVICE_URL: process.env.MEDIA_SERVICE_URL ?? "http://localhost:8082",
-  RABBITMQ_URL: process.env.RABBITMQ_URL ?? "amqp://guest:guest@localhost:5672",
+  // Shared with job-service. It sends this with every live update; anything without it is rejected.
+  INTERNAL_KEY: process.env.INTERNAL_KEY ?? "dev-internal-key",
   CORS_ORIGIN: (process.env.CORS_ORIGIN ?? "http://localhost:5173")
     .split(",")
     .map((origin) => origin.trim())

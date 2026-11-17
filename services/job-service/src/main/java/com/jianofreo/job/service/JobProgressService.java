@@ -1,12 +1,11 @@
 package com.jianofreo.job.service;
 
 import com.jianofreo.job.client.MediaClient;
-import com.jianofreo.job.dto.message.ProgressMessage;
+import com.jianofreo.job.dto.engine.ChunkTask;
 import com.jianofreo.job.entity.ChunkStatus;
 import com.jianofreo.job.entity.Job;
 import com.jianofreo.job.entity.JobChunk;
 import com.jianofreo.job.entity.JobStatus;
-import com.jianofreo.job.messaging.MessagePublisher;
 import com.jianofreo.job.repository.JobChunkRepository;
 import com.jianofreo.job.repository.JobRepository;
 import lombok.RequiredArgsConstructor;
@@ -15,10 +14,14 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.function.Supplier;
 
 /**
- * Turns the engines' chunk-level reports into job-level state.
- * Called from a single listener thread, so two reports for the same job are never handled at once.
+ * Turns "chunk 3 started / is at frame 40 / finished / failed" into job state: chunk rows, job progress,
+ * the live event for the browser, and the merge once every chunk is done.
+ *
+ * Every public method is synchronized: several engine threads report at the same time, and this keeps
+ * "was that the LAST chunk?" from being decided twice (which would merge the video twice).
  */
 @Slf4j
 @Service
@@ -31,119 +34,135 @@ public class JobProgressService {
     private final JobRepository jobRepository;
     private final JobChunkRepository jobChunkRepository;
     private final ProgressTracker progressTracker;
-    private final MessagePublisher messagePublisher;
+    private final JobEventPublisher jobEventPublisher;
     private final MergeService mergeService;
     private final MediaClient mediaClient;
 
-    public void handle(ProgressMessage message) {
-        for (int attempt = 0; attempt < 3; attempt++) {
-            try {
-                handleOnce(message);
-                return;
-            } catch (ObjectOptimisticLockingFailureException e) {
-                // A cancel saved the job between our read and our write. Retry with fresh state.
+    /** A chunk is about to run. Returns false when its job was cancelled, failed or deleted in the meantime. */
+    public synchronized boolean chunkStarted(ChunkTask task, String engineName) {
+        return withRetry(() -> {
+            Job job = activeJob(task.getJobId());
+            JobChunk chunk = job == null ? null : findChunk(task);
+            if (chunk == null) {
+                return false;
             }
-        }
-        log.warn("Gave up on progress message after retries: {}", message);
+            seedTracker(job);
+
+            Instant now = Instant.now();
+            chunk.setStatus(ChunkStatus.PROCESSING);
+            chunk.setWorker(engineName);
+            chunk.setStartedAt(now);
+            jobChunkRepository.save(chunk);
+
+            if (job.getStatus() == JobStatus.QUEUED) {
+                job.setStatus(JobStatus.PROCESSING);
+                job.setStartedAt(now);
+            }
+            saveAndPublish(job, job.getProgress(), now);
+            return true;
+        });
     }
 
-    private void handleOnce(ProgressMessage message) {
-        Job job = jobRepository.findById(message.getJobId()).orElse(null);
-        if (job == null || job.getStatus().isTerminal() || job.getStatus() == JobStatus.MERGING) {
-            return; // deleted, cancelled, failed, or late messages after the last chunk
-        }
-        JobChunk chunk = jobChunkRepository.findByJob_IdAndChunkIndex(job.getId(), message.getChunkIndex()).orElse(null);
-        if (chunk == null) {
-            return;
-        }
+    /** The engine finished another frame pair. Only touches the database about twice a second per job. */
+    public synchronized void chunkProgress(ChunkTask task, int framesDone) {
+        withRetry(() -> {
+            Job job = activeJob(task.getJobId());
+            JobChunk chunk = job == null ? null : findChunk(task);
+            if (chunk == null || chunk.getStatus() == ChunkStatus.COMPLETED) {
+                return null;
+            }
+            seedTracker(job);
+            progressTracker.update(job.getId(), chunk.getChunkIndex(), Math.min(framesDone, chunk.getFrameCount()));
 
+            int progress = percent(job);
+            if (progress != job.getProgress() && progressTracker.shouldPersist(job.getId())) {
+                saveAndPublish(job, progress, Instant.now());
+            }
+            return null;
+        });
+    }
+
+    /** A chunk is finished. When it was the last one, the job moves on to merging. */
+    public synchronized void chunkDone(ChunkTask task, int framesDone, String outputPath) {
+        withRetry(() -> {
+            Job job = activeJob(task.getJobId());
+            JobChunk chunk = job == null ? null : findChunk(task);
+            if (chunk == null) {
+                return null;
+            }
+            seedTracker(job);
+
+            Instant now = Instant.now();
+            chunk.setStatus(ChunkStatus.COMPLETED);
+            chunk.setOutputPath(outputPath);
+            chunk.setFinishedAt(now);
+            jobChunkRepository.save(chunk);
+            progressTracker.update(job.getId(), chunk.getChunkIndex(), chunk.getFrameCount());
+
+            job.setCompletedChunks(jobChunkRepository.countByJob_IdAndStatus(job.getId(), ChunkStatus.COMPLETED));
+            boolean allDone = job.getCompletedChunks().equals(job.getTotalChunks());
+            if (allDone) {
+                job.setStatus(JobStatus.MERGING);
+            }
+            saveAndPublish(job, allDone ? PROCESSING_SHARE : percent(job), now);
+
+            if (allDone) {
+                log.info("job_chunks_done id={} chunks={} -> merging", job.getId(), job.getTotalChunks());
+                mergeService.mergeAsync(job.getId());
+            }
+            return null;
+        });
+    }
+
+    /** A chunk failed twice: the whole job fails with a readable reason. */
+    public synchronized void chunkFailed(ChunkTask task, String error) {
+        withRetry(() -> {
+            Job job = activeJob(task.getJobId());
+            if (job == null) {
+                return null;
+            }
+            JobChunk chunk = findChunk(task);
+            if (chunk != null) {
+                chunk.setStatus(ChunkStatus.FAILED);
+                chunk.setFinishedAt(Instant.now());
+                jobChunkRepository.save(chunk);
+            }
+
+            job.setStatus(JobStatus.FAILED);
+            job.setErrorMessage("Chunk " + task.getChunkIndex() + " failed: " + error);
+            job.setFinishedAt(Instant.now());
+            job.setUpdatedAt(Instant.now());
+            jobEventPublisher.publishJobChanged(jobRepository.save(job));
+            progressTracker.clear(job.getId());
+            mediaClient.deleteWorkdirQuietly(job.getId());
+            log.warn("job_failed id={} reason={}", job.getId(), job.getErrorMessage());
+            return null;
+        });
+    }
+
+    // ------------------------------------------------------------------ helpers
+
+    /** The job, or null when it is gone, finished, cancelled or already merging (late reports are ignored). */
+    private Job activeJob(Integer jobId) {
+        return jobRepository.findById(jobId)
+                .filter(job -> !job.getStatus().isTerminal() && job.getStatus() != JobStatus.MERGING)
+                .orElse(null);
+    }
+
+    private JobChunk findChunk(ChunkTask task) {
+        return jobChunkRepository.findByJob_IdAndChunkIndex(task.getJobId(), task.getChunkIndex()).orElse(null);
+    }
+
+    private void seedTracker(Job job) {
         if (!progressTracker.isTracked(job.getId())) {
             progressTracker.seed(job.getId(), jobChunkRepository.findByJob_IdOrderByChunkIndexAsc(job.getId()));
         }
-
-        boolean mustSave = false;
-        Instant now = Instant.now();
-        if (job.getStatus() == JobStatus.QUEUED) {
-            job.setStatus(JobStatus.PROCESSING);
-            job.setStartedAt(now);
-            mustSave = true;
-        }
-
-        switch (message.getStatus()) {
-            case "PROGRESS" -> {
-                if (chunk.getStatus() == ChunkStatus.COMPLETED) {
-                    return; // late tick from a redelivered copy: don't move the bar backwards
-                }
-                progressTracker.update(job.getId(), chunk.getChunkIndex(),
-                        Math.min(nz(message.getFramesDone()), chunk.getFrameCount()));
-                boolean newWorker = message.getWorker() != null && !message.getWorker().equals(chunk.getWorker());
-                if (chunk.getStatus() == ChunkStatus.PENDING || newWorker) {
-                    // first tick, or another replica took over after a crash (RabbitMQ redelivery)
-                    chunk.setStatus(ChunkStatus.PROCESSING);
-                    chunk.setWorker(message.getWorker());
-                    chunk.setStartedAt(now);
-                    jobChunkRepository.save(chunk);
-                    mustSave = true; // the UI chunk grid shows which replica took it
-                }
-            }
-            case "DONE" -> {
-                if (chunk.getStatus() == ChunkStatus.COMPLETED) {
-                    return; // duplicate after a redelivery
-                }
-                chunk.setStatus(ChunkStatus.COMPLETED);
-                chunk.setOutputPath(message.getOutputPath());
-                chunk.setWorker(message.getWorker());
-                if (chunk.getStartedAt() == null) chunk.setStartedAt(now);
-                chunk.setFinishedAt(now);
-                jobChunkRepository.save(chunk);
-                progressTracker.update(job.getId(), chunk.getChunkIndex(), chunk.getFrameCount());
-                job.setCompletedChunks(jobChunkRepository.countByJob_IdAndStatus(job.getId(), ChunkStatus.COMPLETED));
-                mustSave = true;
-            }
-            case "FAILED" -> {
-                chunk.setStatus(ChunkStatus.FAILED);
-                chunk.setFinishedAt(now);
-                jobChunkRepository.save(chunk);
-                failJob(job, "Chunk " + chunk.getChunkIndex() + " failed: " + message.getError());
-                return;
-            }
-            default -> {
-                log.warn("Unknown progress status {}", message.getStatus());
-                return;
-            }
-        }
-
-        boolean allDone = job.getCompletedChunks().equals(job.getTotalChunks());
-        int progress = allDone ? PROCESSING_SHARE : percent(job);
-        if (allDone) {
-            job.setStatus(JobStatus.MERGING);
-        }
-
-        boolean progressMoved = progress != job.getProgress();
-        if (mustSave || allDone || (progressMoved && progressTracker.shouldPersist(job.getId()))) {
-            job.setProgress(progress);
-            job.setUpdatedAt(now);
-            Job saved = jobRepository.save(job);
-            messagePublisher.publishJobChanged(saved);
-        }
-
-        if (allDone) {
-            log.info("job_chunks_done id={} chunks={} → merging", job.getId(), job.getTotalChunks());
-            mergeService.mergeAsync(job.getId());
-        }
     }
 
-    private void failJob(Job job, String reason) {
-        job.setStatus(JobStatus.FAILED);
-        job.setErrorMessage(reason);
-        job.setFinishedAt(Instant.now());
-        job.setUpdatedAt(Instant.now());
-        Job saved = jobRepository.save(job);
-        messagePublisher.publishCancel(job.getId()); // stop the other chunks of this job
-        messagePublisher.publishJobChanged(saved);
-        progressTracker.clear(job.getId());
-        mediaClient.deleteWorkdirQuietly(job.getId());
-        log.warn("job_failed id={} reason={}", job.getId(), reason);
+    private void saveAndPublish(Job job, int progress, Instant now) {
+        job.setProgress(progress);
+        job.setUpdatedAt(now);
+        jobEventPublisher.publishJobChanged(jobRepository.save(job));
     }
 
     private int percent(Job job) {
@@ -152,7 +171,16 @@ public class JobProgressService {
         return (int) Math.min(PROCESSING_SHARE, done * PROCESSING_SHARE / total);
     }
 
-    private static int nz(Integer value) {
-        return value == null ? 0 : value;
+    /** A cancel can save the job between our read and our write (optimistic locking). Read again and retry. */
+    private <T> T withRetry(Supplier<T> action) {
+        for (int attempt = 0; attempt < 3; attempt++) {
+            try {
+                return action.get();
+            } catch (ObjectOptimisticLockingFailureException e) {
+                // try again with fresh state
+            }
+        }
+        log.warn("Gave up on a progress update after retries");
+        return null;
     }
 }

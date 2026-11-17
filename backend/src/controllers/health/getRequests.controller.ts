@@ -2,14 +2,13 @@ import type { Request, Response } from "express";
 import { jobService } from "../../clients/jobService.client.js";
 import { mediaService } from "../../clients/mediaService.client.js";
 import { getJobStreamStats } from "../../services/job-sse/index.js";
-import { isRabbitConnected } from "../../services/job-sse/rabbitListener.js";
 
 type ServiceState = "UP" | "DOWN";
 
 interface HealthResponse {
   message: string;
   status: ServiceState;
-  services: { bff: ServiceState; jobService: ServiceState; mediaService: ServiceState; rabbitmq: ServiceState };
+  services: { bff: ServiceState; jobService: ServiceState; mediaService: ServiceState };
   liveScreens: number;
 }
 
@@ -28,7 +27,6 @@ export const getHealth = async (_req: Request, res: Response<HealthResponse>) =>
     bff: "UP" as const,
     jobService: jobState,
     mediaService: mediaState,
-    rabbitmq: (isRabbitConnected() ? "UP" : "DOWN") as ServiceState,
   };
   const allUp = Object.values(services).every((state) => state === "UP");
   return res.status(allUp ? 200 : 503).json({
