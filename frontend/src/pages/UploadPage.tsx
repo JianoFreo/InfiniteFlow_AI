@@ -1,10 +1,13 @@
 import PipelineExplainer from "../components/Upload/PipelineExplainer";
 import UploadForm from "../components/Upload/UploadForm";
 import type { UploadProgressInfo } from "../components/Upload/UploadForm";
-import type { JobMode } from "../interface/Job";
+import type { JobMode, PreprocessStep } from "../interface/Job";
 
 interface UploadPageProps {
-  onUpload: (input: { file: File; factor: number; mode: JobMode }, onProgress: (p: UploadProgressInfo) => void) => Promise<void>;
+  onUpload: (
+    input: { file: File; factor: number; mode: JobMode; preprocess: PreprocessStep[] },
+    onProgress: (p: UploadProgressInfo) => void,
+  ) => Promise<void>;
 }
 
 const UploadPage = ({ onUpload }: UploadPageProps) => (

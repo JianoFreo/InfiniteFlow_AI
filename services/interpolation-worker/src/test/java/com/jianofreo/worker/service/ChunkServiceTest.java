@@ -25,7 +25,7 @@ class ChunkServiceTest {
     private final ChunkService service = new ChunkService(engineRunner, publisher, cancelRegistry, jobClient, props);
 
     private final ChunkTask task = new ChunkTask(7, 3, "/data/in.mp4", 144, 48, false, 4, "flow", "24/1",
-            1280, 720, "/tmp/infiniteflow-test-chunk_00003.mp4");
+            1280, 720, "/tmp/infiniteflow-test-chunk_00003.mp4", null);
 
     @BeforeEach
     void jobIsActive() {

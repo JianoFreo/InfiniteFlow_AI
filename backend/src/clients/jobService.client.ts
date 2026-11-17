@@ -6,7 +6,7 @@ import type { ServiceChunk, ServiceJob } from "../controllers/job/dto/shared.dto
 export const jobServiceApi = axios.create({ baseURL: ENV.JOB_SERVICE_URL, timeout: 15_000 });
 
 export const jobService = {
-  async createJob(body: { sourceMediaId: number; factor: number; mode: string }) {
+  async createJob(body: { sourceMediaId: number; factor: number; mode: string; preprocess?: string }) {
     const { data } = await jobServiceApi.post<ServiceJob>("/jobs", body);
     return data;
   },

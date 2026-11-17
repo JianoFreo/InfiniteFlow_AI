@@ -66,7 +66,7 @@ const JobOverview = ({ job }: { job: JobDetail }) => {
           icon={Layers}
           label="Output"
           value={`${formatFps(job.output.fps)} fps`}
-          detail={`${formatNumber(job.output.frameCount)} frames · ${job.mode === "flow" ? "optical flow" : "blend"}`}
+          detail={`${formatNumber(job.output.frameCount)} frames · ${job.mode === "flow" ? "optical flow" : "blend"}${job.preprocess.length ? ` · ${job.preprocess.join(" + ")}` : ""}`}
         />
         <StatTile
           icon={Gauge}

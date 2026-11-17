@@ -7,7 +7,8 @@ interpolation-worker, which starts this module as a child process for each chunk
     stdin   one JSON chunk task, the same camelCase fields job-service publishes:
             {"jobId": 7, "chunkIndex": 3, "sourcePath": "...", "startFrame": 144, "frameCount": 48,
              "last": false, "factor": 4, "mode": "flow", "fps": "24/1", "width": 1280, "height": 720,
-             "outputPath": "/data/jobs/7/chunk_00003.mp4"}
+             "outputPath": "/data/jobs/7/chunk_00003.mp4",
+             "preprocess": "denoise,sharpen"}   (preprocess is optional: denoise, deband, sharpen)
 
     stdout  one JSON object per line, nothing else:
             {"event": "progress", "framesDone": 12}

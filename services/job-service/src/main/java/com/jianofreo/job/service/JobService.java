@@ -56,6 +56,7 @@ public class JobService {
         }
 
         String mode = request.getMode() == null ? "flow" : request.getMode();
+        String preprocess = request.getPreprocess() == null || request.getPreprocess().isBlank() ? null : request.getPreprocess();
         int framesPerChunk = ChunkPlanner.framesPerChunk(media.getFpsValue(), props.chunkSeconds());
         List<ChunkPlanner.ChunkPlan> plans = ChunkPlanner.plan(media.getFrameCount(), framesPerChunk);
 
@@ -65,7 +66,7 @@ public class JobService {
                 media.getFileName(), media.getPath(), media.getFps(), media.getFpsValue(),
                 media.getWidth(), media.getHeight(), media.getFrameCount(), media.getDurationMs(),
                 media.getHasAudio(), media.getSizeBytes(), null,
-                plans.size(), 0, now, now, null, null);
+                plans.size(), 0, now, now, null, null, preprocess);
         Job saved = jobRepository.save(job);
 
         List<JobChunk> chunks = new ArrayList<>();
@@ -79,7 +80,7 @@ public class JobService {
         for (ChunkPlanner.ChunkPlan plan : plans) {
             messagePublisher.publishChunk(new ChunkTask(saved.getId(), plan.index(), media.getPath(),
                     plan.startFrame(), plan.frameCount(), plan.last(), saved.getFactor(), mode,
-                    media.getFps(), media.getWidth(), media.getHeight(), chunkOutputPath(saved.getId(), plan.index())));
+                    media.getFps(), media.getWidth(), media.getHeight(), chunkOutputPath(saved.getId(), plan.index()), preprocess));
         }
         messagePublisher.publishJobChanged(saved);
 

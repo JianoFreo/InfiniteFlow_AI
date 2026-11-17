@@ -9,6 +9,7 @@ export namespace addJob {
   export interface query {
     factor?: string;
     mode?: string;
+    preprocess?: string;
   }
   export interface response {
     message: string;

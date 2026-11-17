@@ -26,4 +26,6 @@ public class ChunkTask {
     private Integer width;
     private Integer height;
     private String outputPath;
+    /** Comma-separated pre-processing steps (denoise, deband, sharpen), or null for none. */
+    private String preprocess;
 }

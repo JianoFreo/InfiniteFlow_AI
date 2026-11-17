@@ -59,4 +59,7 @@ public class Job {
     private Instant updatedAt;
     private Instant startedAt;
     private Instant finishedAt;
+
+    /** Comma-separated pre-processing steps applied to every frame before interpolation, or null. */
+    private String preprocess;
 }

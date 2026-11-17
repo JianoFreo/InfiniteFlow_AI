@@ -27,4 +27,5 @@ public class ChunkTask {
     private Integer width;
     private Integer height;
     private String outputPath;
+    private String preprocess;
 }

@@ -81,7 +81,7 @@ class EngineRunnerTest {
     }
 
     private static ChunkTask task(String mode) {
-        return new ChunkTask(7, 0, "/in.mp4", 0, 3, false, 2, mode, "24/1", 64, 48, "/out/chunk_00000.mp4");
+        return new ChunkTask(7, 0, "/in.mp4", 0, 3, false, 2, mode, "24/1", 64, 48, "/out/chunk_00000.mp4", null);
     }
 
     @Test

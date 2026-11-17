@@ -9,7 +9,7 @@ import type { NavItem, ServiceHealth } from "../components/SideBar";
 import Toast from "../components/Toast";
 import type { ToastMessage } from "../components/Toast";
 import type { UploadProgressInfo } from "../components/Upload/UploadForm";
-import type { Job, JobChangeEvent, JobDetail, JobMode } from "../interface/Job";
+import type { Job, JobChangeEvent, JobDetail, JobMode, PreprocessStep } from "../interface/Job";
 import { isActive } from "../interface/Job";
 import { api, errorMessage } from "../lib/axios";
 import { connectJobStream } from "../services/job-sse/connectJobStream";
@@ -177,14 +177,14 @@ const Studio = () => {
   };
 
   const uploadJob = async (
-    { file, factor, mode }: { file: File; factor: number; mode: JobMode },
+    { file, factor, mode, preprocess }: { file: File; factor: number; mode: JobMode; preprocess: PreprocessStep[] },
     onProgress: (p: UploadProgressInfo) => void,
   ) => {
     const form = new FormData();
     form.append("file", file);
     try {
       const { data } = await api.post<{ job: Job }>("/api/jobs", form, {
-        params: { factor, mode },
+        params: { factor, mode, ...(preprocess.length ? { preprocess: preprocess.join(",") } : {}) },
         timeout: 0,
         onUploadProgress: (event) => onProgress({ loaded: event.loaded, total: event.total ?? file.size }),
       });

@@ -21,7 +21,7 @@ from typing import Callable, Iterable
 
 import numpy as np
 
-from app.ffmpeg_io import FrameReader, FrameWriter
+from app.ffmpeg_io import FrameReader, FrameWriter, parse_preprocess
 from app.flow import Interpolator
 
 
@@ -43,6 +43,7 @@ class ChunkTask:
     width: int
     height: int
     output_path: str
+    preprocess: tuple[str, ...] = ()
 
     @classmethod
     def from_message(cls, data: dict) -> "ChunkTask":
@@ -60,6 +61,7 @@ class ChunkTask:
             width=int(data["width"]),
             height=int(data["height"]),
             output_path=str(data["outputPath"]),
+            preprocess=tuple(parse_preprocess(data.get("preprocess"))),
         )
         if not 2 <= task.factor <= 8:
             raise ValueError("factor must be between 2 and 8")
@@ -123,7 +125,7 @@ def process_chunk(
 ) -> ChunkResult:
     fps = Fraction(task.fps)
     frames_needed = task.frame_count + (0 if task.last else 1)
-    reader = FrameReader(task.source_path, task.start_frame, frames_needed, fps, task.width, task.height, threads)
+    reader = FrameReader(task.source_path, task.start_frame, frames_needed, fps, task.width, task.height, threads, task.preprocess)
     writer: FrameWriter | None = None
 
     def emit(frame: np.ndarray) -> None:

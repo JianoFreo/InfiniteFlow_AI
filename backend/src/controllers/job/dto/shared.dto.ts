@@ -33,6 +33,7 @@ export interface ServiceJob {
   updatedAt: string | null;
   startedAt: string | null;
   finishedAt: string | null;
+  preprocess?: string | null;
 }
 
 export interface ServiceChunk {
@@ -68,6 +69,7 @@ export interface JobView {
   status: JobStatus;
   mode: "flow" | "blend";
   factor: number;
+  preprocess: string[];
   progress: number;
   error: string | null;
   source: {

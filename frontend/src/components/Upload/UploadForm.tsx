@@ -1,10 +1,11 @@
 import { Sparkles } from "lucide-react";
 import { useRef, useState } from "react";
 import type { FormEvent } from "react";
-import type { JobMode } from "../../interface/Job";
+import type { JobMode, PreprocessStep } from "../../interface/Job";
 import DropZone from "./UploadForm/DropZone";
 import FactorSlider from "./UploadForm/FactorSlider";
 import ModeToggle from "./UploadForm/ModeToggle";
+import PreprocessOptions from "./UploadForm/PreprocessOptions";
 import UploadProgress from "./UploadForm/UploadProgress";
 
 export interface UploadProgressInfo {
@@ -13,13 +14,14 @@ export interface UploadProgressInfo {
 }
 
 interface UploadFormProps {
-  onSubmit: (input: { file: File; factor: number; mode: JobMode }, onProgress: (p: UploadProgressInfo) => void) => Promise<void>;
+  onSubmit: (input: { file: File; factor: number; mode: JobMode; preprocess: PreprocessStep[] }, onProgress: (p: UploadProgressInfo) => void) => Promise<void>;
 }
 
 const UploadForm = ({ onSubmit }: UploadFormProps) => {
   const [file, setFile] = useState<File | null>(null);
   const [factor, setFactor] = useState(4);
   const [mode, setMode] = useState<JobMode>("flow");
+  const [preprocess, setPreprocess] = useState<PreprocessStep[]>([]);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState({ loaded: 0, total: 0, bytesPerSecond: 0 });
   const startedAt = useRef(0);
@@ -31,7 +33,7 @@ const UploadForm = ({ onSubmit }: UploadFormProps) => {
     startedAt.current = performance.now();
     setProgress({ loaded: 0, total: file.size, bytesPerSecond: 0 });
     try {
-      await onSubmit({ file, factor, mode }, ({ loaded, total }) => {
+      await onSubmit({ file, factor, mode, preprocess }, ({ loaded, total }) => {
         const seconds = (performance.now() - startedAt.current) / 1000;
         setProgress({ loaded, total, bytesPerSecond: seconds > 0 ? loaded / seconds : 0 });
       });
@@ -48,6 +50,7 @@ const UploadForm = ({ onSubmit }: UploadFormProps) => {
       <DropZone file={file} disabled={uploading} onFile={setFile} />
       <FactorSlider value={factor} disabled={uploading} onChange={setFactor} />
       <ModeToggle value={mode} disabled={uploading} onChange={setMode} />
+      <PreprocessOptions value={preprocess} disabled={uploading} onChange={setPreprocess} />
       {uploading && <UploadProgress {...progress} />}
       <button
         type="submit"

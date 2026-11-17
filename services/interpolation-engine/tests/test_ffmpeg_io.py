@@ -70,3 +70,12 @@ def test_writer_pads_odd_dimensions(tmp_path):
         writer.write(np.zeros((51, 99, 3), np.uint8))
     writer.close()
     assert out.stat().st_size > 0
+
+
+def test_parse_preprocess():
+    from app.ffmpeg_io import parse_preprocess
+
+    assert parse_preprocess(None) == []
+    assert parse_preprocess("denoise, sharpen,denoise") == ["denoise", "sharpen"]
+    with pytest.raises(ValueError):
+        parse_preprocess("denoise,blur")

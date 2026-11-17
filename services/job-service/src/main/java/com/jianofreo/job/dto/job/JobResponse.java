@@ -40,4 +40,6 @@ public class JobResponse {
     private Instant updatedAt;
     private Instant startedAt;
     private Instant finishedAt;
+
+    private String preprocess;
 }

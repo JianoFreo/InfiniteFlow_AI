@@ -23,4 +23,8 @@ public class JobRequest {
     /** Optional, defaults to "flow". */
     @Pattern(regexp = "flow|blend", message = "must be 'flow' or 'blend'")
     private String mode;
+
+    /** Optional comma-separated clean-up steps run on every frame before interpolation: denoise, deband, sharpen. */
+    @Pattern(regexp = "^(denoise|deband|sharpen)(,(denoise|deband|sharpen))*$", message = "must be a comma-separated list of denoise, deband, sharpen")
+    private String preprocess;
 }

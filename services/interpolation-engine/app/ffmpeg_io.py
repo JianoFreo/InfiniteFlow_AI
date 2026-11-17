@@ -12,7 +12,7 @@ import os
 import subprocess
 import tempfile
 from fractions import Fraction
-from typing import Iterator
+from typing import Iterable, Iterator
 
 import numpy as np
 
@@ -27,6 +27,24 @@ def fraction_str(value: Fraction) -> str:
     return f"{value.numerator}/{value.denominator}"
 
 
+# Clean-up steps a job can ask for. All are purely spatial (no state carried between frames), so every
+# chunk of a job produces exactly the pixels a single-pass run would: chunk seams stay invisible.
+PREPROCESS_FILTERS = {
+    "denoise": "hqdn3d=3:2:0:0",   # spatial-only denoise; noise confuses optical flow
+    "deband": "gradfun=1.2:16",    # smooths banding in gradients
+    "sharpen": "unsharp=5:5:0.6:5:5:0.0",
+}
+
+
+def parse_preprocess(value: str | None) -> list[str]:
+    """'denoise,sharpen' -> ['denoise', 'sharpen']. Unknown names raise ValueError."""
+    steps = [s.strip() for s in (value or "").split(",") if s.strip()]
+    unknown = [s for s in steps if s not in PREPROCESS_FILTERS]
+    if unknown:
+        raise ValueError(f"unknown preprocess step(s): {', '.join(unknown)}")
+    return list(dict.fromkeys(steps))
+
+
 def _read_text(handle) -> str:
     handle.seek(0)
     return handle.read().decode("utf-8", "replace").strip()
@@ -36,7 +54,7 @@ class FrameReader:
     """Decodes `count` frames starting at frame `start_frame` as BGR arrays of shape (height, width, 3)."""
 
     def __init__(self, path: str, start_frame: int, count: int, fps: Fraction, width: int, height: int,
-                 threads: int = 0) -> None:
+                 threads: int = 0, preprocess: Iterable[str] = ()) -> None:
         self.width, self.height = width, height
         self.frame_bytes = width * height * 3
         self.frames_read = 0
@@ -55,6 +73,7 @@ class FrameReader:
             # even for phone videos with a slightly variable frame rate.
             "-r", fraction_str(fps),
             "-s", f"{width}x{height}",
+            *(["-vf", ",".join(PREPROCESS_FILTERS[s] for s in preprocess)] if preprocess else []),
             "-pix_fmt", "bgr24",
             "-f", "rawvideo", "pipe:1",
         ]

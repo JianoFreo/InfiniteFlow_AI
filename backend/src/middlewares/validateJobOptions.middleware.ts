@@ -3,7 +3,11 @@ import type { NextFunction, Request, Response } from "express";
 export interface JobOptions {
   factor: number;
   mode: "flow" | "blend";
+  /** Comma-separated clean-up steps, or undefined for none. */
+  preprocess?: string;
 }
+
+export const PREPROCESS_STEPS = ["denoise", "deband", "sharpen"] as const;
 
 /**
  * Validates ?factor and ?mode BEFORE the upload starts streaming, so a bad request fails in
@@ -20,7 +24,14 @@ export const validateJobOptions = (req: Request, res: Response, next: NextFuncti
     return res.status(400).json({ message: "mode must be 'flow' or 'blend'" });
   }
 
-  res.locals.jobOptions = { factor, mode } satisfies JobOptions;
+  const steps = String(req.query.preprocess ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  const invalid = steps.filter((s) => !(PREPROCESS_STEPS as readonly string[]).includes(s));
+  if (invalid.length > 0) {
+    return res.status(400).json({ message: `preprocess must be a comma-separated list of: ${PREPROCESS_STEPS.join(", ")}` });
+  }
+  const preprocess = [...new Set(steps)].join(",") || undefined;
+
+  res.locals.jobOptions = { factor, mode, preprocess } satisfies JobOptions;
   next();
 };
 

@@ -52,7 +52,7 @@ describe("POST /api/jobs", () => {
 
     expect(res.status).toBe(201);
     expect(res.body.job).toMatchObject({ id: 7, status: "queued", factor: 4 });
-    expect(jobService.createJob).toHaveBeenCalledWith({ sourceMediaId: 3, factor: 4, mode: "flow" });
+    expect(jobService.createJob).toHaveBeenCalledWith({ sourceMediaId: 3, factor: 4, mode: "flow", preprocess: undefined });
   });
 
   it("deletes the uploaded file when job creation fails", async () => {

@@ -16,6 +16,7 @@ import time
 from fractions import Fraction
 
 from app import config
+from app.ffmpeg_io import parse_preprocess
 from app.flow import create_interpolator
 from app.pipeline import ChunkTask, process_chunk
 
@@ -39,6 +40,7 @@ def main() -> None:
     parser.add_argument("output")
     parser.add_argument("--factor", type=int, default=2)
     parser.add_argument("--mode", choices=["flow", "blend"], default="flow")
+    parser.add_argument("--preprocess", default="", help="comma-separated: denoise,deband,sharpen")
     parser.add_argument("--chunk-frames", type=int, default=0, help="0 = whole video as one chunk")
     args = parser.parse_args()
 
@@ -55,7 +57,8 @@ def main() -> None:
         last = index == len(starts) - 1
         task = ChunkTask(0, index, os.path.abspath(args.input), start, min(size, total - start), last,
                          args.factor, args.mode, info["fps"], info["width"], info["height"],
-                         os.path.join(workdir, f"chunk_{index:05d}.mp4"))
+                         os.path.join(workdir, f"chunk_{index:05d}.mp4"),
+                         tuple(parse_preprocess(args.preprocess)))
         result = process_chunk(task, interpolator, x264_preset=config.X264_PRESET, x264_crf=config.X264_CRF,
                                threads=config.ENGINE_THREADS)
         written += result.frames_written

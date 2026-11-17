@@ -2,12 +2,14 @@
 
 export type JobStatus = "queued" | "processing" | "merging" | "completed" | "failed" | "cancelled";
 export type JobMode = "flow" | "blend";
+export type PreprocessStep = "denoise" | "deband" | "sharpen";
 
 export interface Job {
   id: number;
   status: JobStatus;
   mode: JobMode;
   factor: number;
+  preprocess: PreprocessStep[];
   progress: number;
   error: string | null;
   source: {

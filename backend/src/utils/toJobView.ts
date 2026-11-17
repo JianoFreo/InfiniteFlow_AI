@@ -22,6 +22,7 @@ export const toJobView = (job: ServiceJob): JobView => {
     status,
     mode: job.mode,
     factor: job.factor,
+    preprocess: job.preprocess ? job.preprocess.split(",") : [],
     progress: job.progress ?? 0,
     error: job.errorMessage,
     source: {
