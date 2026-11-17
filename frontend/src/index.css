@@ -87,13 +87,6 @@ html { scroll-behavior: smooth; }
 .marquee-reverse { animation-direction: reverse; animation-duration: 36s; }
 @keyframes marquee { to { transform: translateX(-50%); } }
 
-/* ---------- statue backdrops (decoration only) ---------- */
-.backdrop-statue {
-  transform: translateY(-50%) perspective(1400px) rotateY(calc(-35deg + var(--p, 0) * 150deg)) scale(calc(1 + var(--p, 0) * 0.2));
-  -webkit-mask-image: radial-gradient(ellipse at center, #000 35%, transparent 72%);
-  mask-image: radial-gradient(ellipse at center, #000 35%, transparent 72%);
-  will-change: transform;
-}
 .hero-copy { transform: translateY(calc(var(--p, 0) * 12vh)); opacity: calc(1 - var(--p, 0) * 1.1); }
 
 /* generated in-between frame: a dither dot-matrix block */

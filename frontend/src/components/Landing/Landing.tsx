@@ -1,9 +1,7 @@
 import { ArrowDown } from "lucide-react";
 import { useRef, useState } from "react";
-import { STATUES } from "../../lib/statues";
 import { useScrollVar } from "../../lib/useScrollVar";
 import Reveal from "./Reveal";
-import StatueBackdrop from "./StatueBackdrop";
 
 const WORDS = ["IN-BETWEEN FRAMES", "OPTICAL FLOW", "24 → 240 FPS", "HAND-WRITTEN NUMPY", "NO PRETRAINED MODELS", "∞ FLOW"];
 
@@ -29,7 +27,6 @@ export const Hero = () => {
 
   return (
     <section ref={ref} className="relative flex min-h-[88vh] flex-col justify-center overflow-hidden px-5 sm:px-10">
-      <StatueBackdrop src={STATUES[0]} side="right" />
       <div className="hero-copy relative z-10 max-w-4xl">
         <p className="mb-5 font-mono text-[11px] uppercase tracking-widest text-ink-dim">
           Video frame interpolation · 2× to 8×
@@ -65,7 +62,6 @@ export const FramesDemo = () => {
   return (
     <section ref={ref} className="relative h-[320vh]">
       <div className="sticky top-0 flex h-screen flex-col justify-center overflow-hidden px-5 sm:px-10">
-        <StatueBackdrop src={STATUES[1]} side="left" />
         <p className="relative z-10 mb-3 font-mono text-[11px] uppercase tracking-widest text-ink-dim">
           01 / What happens to your video
         </p>
@@ -114,7 +110,6 @@ export const Steps = () => {
   useScrollVar(ref, "viewport");
   return (
     <section ref={ref} className="relative overflow-hidden px-5 py-32 sm:px-10">
-      <StatueBackdrop src={STATUES[2]} side="right" />
       <div className="relative z-10 mx-auto max-w-6xl">
         <Reveal as="p" className="mb-10 font-mono text-[11px] uppercase tracking-widest text-ink-dim">
           02 / How it flows

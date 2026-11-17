@@ -2,6 +2,7 @@ import { ListVideo, UploadCloud } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import DitherField from "../components/Dither/DitherField";
+import StatueStage from "../components/Dither/StatueStage";
 import ConfirmDialog from "../components/ConfirmDialog";
 import Header from "../components/Header";
 import SideBar from "../components/SideBar";
@@ -246,6 +247,7 @@ const Studio = () => {
   return (
     <div className="relative flex min-h-full">
       <DitherField />
+      {page === "upload" && <StatueStage modelUrl="/models/head.glb" />}
       <SideBar
         navItems={navItems}
         activePage={page === "job" ? "queue" : page}

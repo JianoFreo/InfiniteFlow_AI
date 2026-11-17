@@ -31,6 +31,9 @@ const UploadPage = ({ onUpload }: UploadPageProps) => (
     <FramesDemo />
     <Marquee reverse />
     <Steps />
+    <p className="relative z-10 px-5 pb-10 text-center font-mono text-[10px] uppercase tracking-widest text-ink-faint sm:px-10">
+      3D head scan: Lee Perry-Smith, CC BY 3.0 (infinite-realities.com)
+    </p>
   </>
 );
 
