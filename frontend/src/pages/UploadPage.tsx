@@ -1,4 +1,4 @@
-import Landing from "../components/Landing/Landing";
+import { FramesDemo, Hero, Marquee, Steps } from "../components/Landing/Landing";
 import Reveal from "../components/Landing/Reveal";
 import PipelineExplainer from "../components/Upload/PipelineExplainer";
 import UploadForm from "../components/Upload/UploadForm";
@@ -11,8 +11,9 @@ interface UploadPageProps {
 
 const UploadPage = ({ onUpload }: UploadPageProps) => (
   <>
-    <Landing />
-    <section id="upload" className="mx-auto max-w-6xl px-4 pb-32 pt-24 sm:px-6">
+    <Hero />
+    <Marquee />
+    <section id="upload" className="mx-auto max-w-6xl px-4 pb-24 pt-20 sm:px-6">
       <Reveal as="h2" className="mb-10 font-display text-6xl uppercase leading-none sm:text-8xl">
         Drop a video.
         <br />
@@ -27,6 +28,9 @@ const UploadPage = ({ onUpload }: UploadPageProps) => (
         </Reveal>
       </div>
     </section>
+    <FramesDemo />
+    <Marquee reverse />
+    <Steps />
   </>
 );
 

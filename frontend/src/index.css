@@ -87,53 +87,22 @@ html { scroll-behavior: smooth; }
 .marquee-reverse { animation-direction: reverse; animation-duration: 36s; }
 @keyframes marquee { to { transform: translateX(-50%); } }
 
-/* ---------- hero ---------- */
-.hero-stage { perspective: 1400px; }
-.hero-statue {
-  transform-style: preserve-3d;
-  transform: rotateY(calc(-26deg + var(--p, 0) * 220deg)) translateY(calc(var(--p, 0) * -8vh)) scale(calc(1 + var(--p, 0) * 0.35));
-  animation: sway 7s ease-in-out infinite alternate;
+/* ---------- statue backdrops (decoration only) ---------- */
+.backdrop-statue {
+  transform: translateY(-50%) perspective(1400px) rotateY(calc(-35deg + var(--p, 0) * 150deg)) scale(calc(1 + var(--p, 0) * 0.2));
+  -webkit-mask-image: radial-gradient(ellipse at center, #000 35%, transparent 72%);
+  mask-image: radial-gradient(ellipse at center, #000 35%, transparent 72%);
   will-change: transform;
 }
-@keyframes sway { from { margin-left: -2.5%; } to { margin-left: 2.5%; } }
-/* the inverted twin is wiped across the statue as you scroll */
-.hero-ghost { clip-path: inset(0 0 0 calc(52% - var(--p, 0) * 52%)); }
-.hero-word {
-  position: absolute;
-  z-index: 5;
-  pointer-events: none;
-  mix-blend-mode: difference;
-  color: #fff;
-  font-size: clamp(5rem, 24vw, 22rem);
-  line-height: 0.82;
-  letter-spacing: -0.02em;
-  margin: 0;
-}
-.hero-word-a { top: 9vh; left: 2vw; transform: translateX(calc(var(--p, 0) * -40vw)); }
-.hero-word-b { bottom: 12vh; right: 2vw; transform: translateX(calc(var(--p, 0) * 40vw)); }
+.hero-copy { transform: translateY(calc(var(--p, 0) * 12vh)); opacity: calc(1 - var(--p, 0) * 1.1); }
 
-/* ---------- horizontal gallery driven by vertical scroll ---------- */
-.gallery-track { width: max-content; transform: translateX(calc(var(--p, 0) * (100vw - 100% - 16vw))); will-change: transform; }
-.gallery-card { transform: translateY(calc(sin(var(--k) * 1.3) * 7vh)) rotate(calc(var(--k) * 1deg - 4deg)); }
-.gallery-card:hover { transform: translateY(-2vh) rotate(0deg) scale(1.04); transition: transform .35s ease; }
-
-/* ---------- statue carousel ring ---------- */
-.ring-scene { perspective: 1600px; perspective-origin: 50% 40%; }
-.ring {
-  position: relative;
-  width: clamp(110px, 16vw, 200px);
-  aspect-ratio: 4 / 5;
-  transform-style: preserve-3d;
-  transform: rotateX(-8deg) rotateY(calc(var(--p, 0) * 900deg));
-  will-change: transform;
+/* generated in-between frame: a dither dot-matrix block */
+.dither-frame {
+  background-image: radial-gradient(var(--color-ink) 45%, transparent 50%);
+  background-size: 3px 3px;
+  animation: frame-in 0.45s ease-out both;
 }
-.ring-item {
-  position: absolute;
-  inset: 0;
-  transform: rotateY(calc(var(--i) * 360deg / var(--n, 6))) translateZ(clamp(260px, 44vw, 560px));
-  border: 1px solid var(--color-line-strong);
-  backface-visibility: visible;
-}
+@keyframes frame-in { from { opacity: 0; transform: scaleY(0.2); } to { opacity: 1; transform: none; } }
 
 .step-title { transition: transform 0.4s ease, -webkit-text-stroke 0.4s ease, color 0.4s ease; }
 .step:hover .step-title {
@@ -199,7 +168,7 @@ input[type="range"].factor-slider::-moz-range-thumb {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .progress-active, .marquee, .hero-statue, body::after { animation: none; }
+  .progress-active, .marquee, .dither-frame, body::after { animation: none; }
   .reveal { opacity: 1; transform: none; filter: none; transition: none; }
   html { scroll-behavior: auto; }
 }
