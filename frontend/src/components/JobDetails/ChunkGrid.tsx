@@ -2,8 +2,8 @@ import type { Chunk } from "../../interface/Job";
 import { cn, formatDuration, workerColor } from "../../lib/utils";
 
 /**
- * One cell per chunk. The fill shows how far each chunk is; the color shows WHICH engine replica
- * processed it. With 3 replicas you'll see 3 colors working at the same time: the parallelism, visible.
+ * One cell per chunk. The fill shows how far each chunk is; the color shows WHICH engine thread
+ * processed it. With 2 threads you'll see 2 colors working at the same time: the parallelism, visible.
  */
 const ChunkGrid = ({ chunks }: { chunks: Chunk[] }) => {
   const workers = [...new Set(chunks.map((chunk) => chunk.worker).filter((w): w is string => Boolean(w)))];
@@ -13,7 +13,7 @@ const ChunkGrid = ({ chunks }: { chunks: Chunk[] }) => {
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-sm font-semibold">Chunks</h2>
         <p className="text-xs text-ink-faint">
-          {chunks.length} chunk{chunks.length === 1 ? "" : "s"} · {workers.length} engine replica{workers.length === 1 ? "" : "s"} used
+          {chunks.length} chunk{chunks.length === 1 ? "" : "s"} · {workers.length} engine thread{workers.length === 1 ? "" : "s"} used
         </p>
       </div>
 

@@ -27,7 +27,7 @@ const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)"
 const bell = () => (Math.random() + Math.random() + Math.random() - 1.5) / 1.5;
 
 interface SpaceBackgroundProps {
-  /** 1..8. More means more shooting stars (the app passes how busy the queue is). */
+  /** 1..8. More means more shooting stars (the app passes how many videos are running). */
   intensity: number;
 }
 

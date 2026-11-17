@@ -7,7 +7,7 @@ import StatusBadge from "../StatusBadge";
 import StatTile from "./JobOverview/StatTile";
 
 const STAGE_TEXT: Record<JobDetail["status"], string> = {
-  queued: "Waiting for a free engine replica",
+  queued: "Waiting for a free engine",
   processing: "Engines are generating frames",
   merging: "Joining chunks and restoring audio",
   completed: "Done",

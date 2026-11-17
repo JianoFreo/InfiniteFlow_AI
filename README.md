@@ -15,8 +15,6 @@ Hand-written optical-flow engine powered by **Python + NumPy**. No pretrained mo
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Spring Boot](https://img.shields.io/badge/Spring_Boot-4-6DB33F?style=for-the-badge&logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
-[![RabbitMQ](https://img.shields.io/badge/RabbitMQ-FF6600?style=for-the-badge&logo=rabbitmq&logoColor=white)](https://www.rabbitmq.com/)
-[![Redis](https://img.shields.io/badge/Redis-DC382D?style=for-the-badge&logo=redis&logoColor=white)](https://redis.io/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 
 </div>
@@ -32,174 +30,96 @@ Hand-written optical-flow engine powered by **Python + NumPy**. No pretrained mo
 
 ---
 
-## MVP Scope
+## What the user does
 
-What the user does:
+1. Open the app. No account needed: the browser gets a private guest id.
+2. Drop a video, pick a factor (2x to 8x), optionally pick pre-processing (denoise, deband, sharpen), press **Create**.
+3. Watch the progress, then preview and download the result.
+4. Every video becomes an entry in the sidebar history, like chats in ChatGPT.
 
-1. Upload a video and pick a factor (2x to 8x).
-2. Watch a single progress bar.
-3. Preview and download the result.
-
-What is **out** of the MVP UI: the queue page, queue management, and the per-chunk grid.
-The system still buffers work internally, because that buffer is what lets it absorb millions of users. The user just never sees it.
+**Guests vs accounts.** A guest can run one video at a time and keeps the history in that browser. Signing up (optional) keeps the history on every device, moves the guest videos into the account, and lets the user run several videos side by side (default 5). Limits: `MAX_ACTIVE_GUEST_JOBS`, `MAX_ACTIVE_USER_JOBS` on job-service.
 
 ## Stack
 
 | Part | Tech | Role |
 | --- | --- | --- |
-| `frontend/` | Vite + React 19 + TypeScript (static, served from a CDN) | Upload → progress → preview/download |
-| `backend/` | Express 5 + TypeScript | **BFF / API**: auth, rate limits, the only public API. Stateless, so it scales horizontally |
-| `services/job-service/` | Spring Boot 4 / Java 17 | Owns jobs, splits videos into chunks, tracks progress, triggers the merge |
-| `services/media-service/` | Spring Boot 4 / Java 17 + FFmpeg | Presigned upload/download URLs, probe, merge |
-| `services/interpolation-worker/` | Spring Boot 4 / Java 17 | Takes chunks from the buffer, runs the Python engine on each, handles retries, cancels, timeouts and progress |
-| `services/interpolation-engine/` | **Python + NumPy** (FFmpeg only for frame I/O) | **AI logic only:** hand-written optical flow, flow projection, warping, blending. No server, queue, network or database code |
-| Object storage | MinIO locally, S3-compatible in production | Uploads, chunk outputs and final videos |
-| Internal buffer | RabbitMQ (hidden from users) | Smooths spikes; workers pull work at their own pace |
+| `frontend/` | Vite + React 19 + TypeScript | The app: upload, history sidebar, job page, settings, light/dark theme |
+| `backend/` | Express 5 + TypeScript | **BFF**, the only API the browser talks to. Checks who is calling (guest id or login token), forwards to the services, and pushes live progress to browsers over SSE. No database |
+| `services/job-service/` | Spring Boot 4 / Java 17 | Owns **accounts and jobs**. Splits a video into chunks, runs the Python engine on them (thread pool), tracks progress, triggers the merge |
+| `services/media-service/` | Spring Boot 4 / Java 17 + FFmpeg | Stores files, probes videos, merges chunks |
+| `services/interpolation-engine/` | **Python + NumPy** (FFmpeg only for frame I/O) | **AI logic only:** hand-written optical flow, warping, blending. No server, network or database code |
 | Databases | PostgreSQL 16 (`jobs_db`, `media_db`) | One database per service |
-| Cache / pub-sub | Redis | Rate limits, hot job progress, SSE fan-out across BFF replicas |
+
+There is **no message queue**. job-service runs the engine itself on a fixed pool of threads: when more chunks are waiting than there are threads, the extra ones simply wait their turn in memory.
 
 ## System Overview
 
 ```mermaid
 flowchart LR
-    user(["Browser"])
-    cdn["CDN<br/>React app + finished videos"]
-    lb["Load balancer"]
-
-    subgraph api["API tier (stateless, autoscaled)"]
-        bff1["BFF #1"]
-        bff2["BFF #2"]
-        bffN["BFF #N"]
-    end
-
-    subgraph core["Core services (autoscaled)"]
-        job["job-service"]
-        media["media-service"]
-    end
-
-    subgraph workers["Interpolation workers (autoscaled on backlog)"]
-        e1["Java worker #1<br/>└ python engine (per chunk)"]
-        e2["Java worker #2"]
-        eN["Java worker #N"]
-    end
-
-    s3[("Object storage<br/>MinIO / S3")]
-    buf{{"Internal job buffer<br/>RabbitMQ"}}
-    redis[("Redis<br/>rate limits, progress,<br/>SSE fan-out")]
+    browser(["Browser<br/>React app"])
+    bff["BFF<br/>Express :5000"]
+    job["job-service<br/>Spring :8081<br/>accounts, jobs, chunk runner"]
+    media["media-service<br/>Spring :8082"]
+    py["python -m app.run_chunk<br/>(NumPy math, one process per chunk)"]
     jobsdb[("jobs_db")]
     mediadb[("media_db")]
+    files[("shared volume /data")]
 
-    user -- "static app" --> cdn
-    user -- "API + SSE" --> lb --> bff1 & bff2 & bffN
-    user -- "PUT video (presigned URL)" --> s3
-    cdn -- "GET result (signed URL)" --> s3
-
-    bff1 & bff2 & bffN --> job
-    bff1 & bff2 & bffN --> media
-    bff1 & bff2 & bffN <--> redis
-
+    browser -- "REST /api/..." --> bff
+    bff -- "SSE live progress" --> browser
+    bff --> job
+    bff --> media
+    job -- "POST /internal/job-events" --> bff
     job --> jobsdb
     media --> mediadb
+    job -- "stdin: chunk task, stdout: progress" --> py
     job -- "probe, merge" --> media
-    media <--> s3
-
-    job -- "chunk work" --> buf --> e1 & e2 & eN
-    e1 & e2 & eN <-- "read source / write chunks" --> s3
-    e1 & e2 & eN -- "progress" --> buf --> job
-    job -- "progress events" --> redis
+    media <--> files
+    py <--> files
 ```
 
-**Why this scales to millions of users:**
+## How one video flows through the system
 
-- **Video bytes never pass through our APIs.** The browser uploads straight to object storage with a presigned URL, and downloads come from the CDN. The BFF only handles small JSON requests.
-- **Every tier is stateless and scales horizontally.** BFF, job-service and media-service sit behind load balancers and autoscale on CPU and request rate.
-- **Workers scale on backlog.** They autoscale (for example with KEDA) on the internal buffer's depth, so a traffic spike makes jobs wait a bit longer instead of crashing anything.
-- **Database per service**, with read replicas for the job list and status reads. Job progress is cached in Redis so polling doesn't hit Postgres.
-- **Back-pressure:** per-user rate limits and quotas at the BFF (Redis), plus maximum file size and duration checks before any work is queued.
-- **SSE works across replicas:** whichever BFF replica a browser connects to receives every job event through Redis pub/sub.
+Where to read the code is in brackets.
 
-## End-to-End Flow
+1. **Identify.** Every request carries either a login token or the browser guest id. The BFF turns that into an owner: `u:<userId>` or `g:<guestId>` [`backend/src/middlewares/identity.middleware.ts`].
+2. **Upload.** `POST /api/jobs?factor=4&mode=flow&preprocess=denoise` streams the file straight through the BFF to media-service, which stores and probes it (fps, frames, size, audio) [`backend/src/controllers/job/postRequests.controller.ts`].
+3. **Create the job.** The BFF asks job-service to create the job. job-service first checks the per-person limit (guest 1, account 5), then plans chunks of about 2 seconds [`services/job-service/.../service/JobService.java`, `ChunkPlanner.java`].
+4. **Run the chunks.** `JobRunner` hands one task per chunk to the thread pool. Each free thread starts `python -m app.run_chunk` for its chunk, sends the task as JSON on stdin and reads progress lines from stdout. A failing chunk is retried once, then the job fails [`JobRunner.java`, `EngineRunner.java`].
+5. **Track progress.** After every change (`chunkStarted`, `chunkProgress`, `chunkDone`, `chunkFailed`) `JobProgressService` updates the database and tells the BFF [`JobProgressService.java`, `JobEventPublisher.java`].
+6. **Live update.** job-service posts the event to the BFF (`POST /internal/job-events`, protected by a shared key). The BFF's SSE hub forwards it only to the browsers of that job owner [`backend/src/services/job-sse/`].
+7. **Merge.** When the last chunk finishes, `MergeService` asks media-service to join the chunks without re-encoding and put the audio back. The job becomes `COMPLETED`.
+8. **Download.** `GET /api/jobs/{id}/download` streams the result with Range support so the player can seek.
+
+If job-service restarts while videos are running, those jobs are marked failed on startup (their work was in memory), and the user uploads again.
+
+## Java ↔ Python boundary
+
+Python does the AI math and nothing else. job-service owns everything a server does: threads, retries, cancelling, timeouts and progress. It runs the Python engine as a child process, once per chunk:
 
 ```mermaid
 sequenceDiagram
-    autonumber
-    actor U as Browser
-    participant B as BFF
-    participant M as media-service
-    participant S as Object storage
-    participant J as job-service
-    participant Q as Internal buffer
-    participant E as Java worker x N
-    participant R as Redis
-
-    U->>B: POST /api/uploads {fileName, size}
-    B->>B: auth, rate limit, size check
-    B->>M: request upload slot
-    M-->>B: mediaId + presigned PUT URL
-    B-->>U: presigned URL
-    U->>S: PUT video (direct, resumable)
-    U->>B: POST /api/jobs {mediaId, factor}
-    B->>M: confirm upload
-    M->>S: ffprobe (fps, frames, size, audio)
-    B->>J: create job
-    J->>J: split into frame-range chunks
-    J->>Q: one task per chunk
-    B-->>U: 201 {jobId}
-
-    U->>B: GET /api/jobs/{id}/events (SSE)
-
-    par workers pull chunks in parallel
-        Q->>E: chunk task
-        E->>E: start python -m app.run_chunk (task on stdin)
-        E->>S: Python reads frame range
-        E->>E: Python: NumPy optical flow, warp, blend
-        E->>S: write chunk video
-        E->>Q: progress / done
-    end
-
-    Q->>J: progress
-    J->>R: publish job progress
-    R-->>B: progress event (any replica)
-    B-->>U: SSE: progress %
-
-    J->>M: merge chunks
-    M->>S: concat (no re-encode) + source audio
-    J->>R: COMPLETED
-    R-->>B: event
-    B-->>U: SSE: done + signed download URL
-    U->>S: GET result (via CDN)
-```
-
-## Java ↔ Python Boundary
-
-Python does the AI math and nothing else. The Java `interpolation-worker` owns everything a server does: RabbitMQ, acks and retries, cancellation, timeouts, progress reporting and calls to job-service. It runs the Python engine as a child process, once per chunk:
-
-```mermaid
-sequenceDiagram
-    participant Q as RabbitMQ
-    participant W as interpolation-worker (Java)
+    participant R as JobRunner (pool thread)
     participant P as python -m app.run_chunk
-    participant J as job-service
+    participant S as JobProgressService
 
-    Q->>W: chunk task (interp.chunks, prefetch 1)
-    W->>J: GET /jobs/{id} (still active?)
-    W->>P: start process, task JSON on stdin
+    R->>S: chunkStarted (job still active?)
+    R->>P: start process, task JSON on stdin
     loop every frame pair
-        P-->>W: stdout line: event progress, framesDone n
-        W->>Q: PROGRESS, throttled (interp.progress)
+        P-->>R: stdout line: event progress, framesDone n
+        R->>S: chunkProgress (throttled to ~2 per second)
     end
-    P-->>W: stdout line: event done, outputPath
-    W->>Q: DONE (persistent)
-    W->>Q: ack chunk (only after DONE is out)
-    Note over W,P: Cancel: SIGTERM, Python deletes its partial file, SIGKILL after a grace period
-    Note over W,P: Timeout or crash: retry once, then dead-letter
+    P-->>R: stdout line: event done, outputPath
+    R->>S: chunkDone
+    Note over R,P: Cancel: SIGTERM, Python deletes its partial file, SIGKILL after a grace period
+    Note over R,P: Crash or timeout: tried once more, then chunkFailed
 ```
 
-| Python exit code | Meaning | What Java does |
+| Python exit code | Meaning | What job-service does |
 | --- | --- | --- |
-| `0` + `done` | Chunk written | Publish DONE, ack |
-| `3` + `cancelled` | Stopped by SIGTERM | Ack (job was cancelled) |
-| `1` / `2` + `error`, or crash | Processing error / bad task | Retry once, then publish FAILED and dead-letter |
+| `0` + `done` | Chunk written | `chunkDone` |
+| `3` + `cancelled` | Stopped by SIGTERM | Nothing (the job was cancelled) |
+| `1` / `2` + `error`, or crash | Processing error / bad task | Retry once, then `chunkFailed` and the job fails |
 
 ## The Interpolation Engine (hand-written)
 
@@ -237,7 +157,7 @@ All the math lives in `services/interpolation-engine/app/engine/`. `app/flow.py`
 
 Quality presets (`FLOW_PRESET`): `medium` (default, best), `fast`, `ultrafast`.
 
-**Measured speed** (one replica, one CPU core for the math, `medium` preset):
+**Measured speed** (one engine thread, one CPU core for the math, `medium` preset):
 
 | Source | x2 | x4 |
 | --- | --- | --- |
@@ -245,46 +165,60 @@ Quality presets (`FLOW_PRESET`): `medium` (default, best), `fast`, `ultrafast`.
 | 1280×720 | ~1.1 | ~0.7 |
 | 1920×1080 | ~1.0 | ~0.5 |
 
-Pure NumPy is roughly 10× slower than OpenCV's C++. We make up for it the microservice way: a video is split into chunks that run in parallel on as many worker replicas as needed, and workers autoscale on backlog.
+Pure NumPy is roughly 10× slower than OpenCV's C++. We make up for it by splitting a video into chunks that run in parallel on the engine thread pool (`ENGINE_THREADS`), and by running more than one job-service instance when one machine is not enough.
 
 Chunks overlap by one frame so their boundaries are seamless: concatenating every chunk gives exactly `(N − 1) × factor + 1` frames.
 
-## Job Lifecycle (what the user sees)
+## Job lifecycle
 
 ```mermaid
 stateDiagram-v2
-    [*] --> UPLOADING
-    UPLOADING --> PROCESSING: upload confirmed
-    PROCESSING --> FINALIZING: all chunks done
-    FINALIZING --> READY: merge done
+    [*] --> QUEUED
+    QUEUED --> PROCESSING: first chunk starts
+    PROCESSING --> MERGING: all chunks done
+    MERGING --> COMPLETED: merge done
     PROCESSING --> FAILED
-    FINALIZING --> FAILED
-    UPLOADING --> CANCELLED
+    MERGING --> FAILED
+    QUEUED --> CANCELLED
     PROCESSING --> CANCELLED
-    READY --> [*]
+    COMPLETED --> [*]
     FAILED --> [*]
     CANCELLED --> [*]
 ```
 
-Internally job-service still tracks per-chunk state for retries and crash recovery. The UI shows one progress bar.
+`QUEUED` only means "waiting for a free engine thread". Progress 0-95% is the chunks, the last 5% is the merge.
 
 ## Public API (BFF)
 
+Every `/api/jobs` call needs identity: `Authorization: Bearer <token>` or `X-Guest-Id: <id>` (`?token=` / `?guest=` for `<video>` and download links). A job that belongs to someone else answers 404.
+
 | Method | Path | Description |
 | --- | --- | --- |
-| `POST` | `/api/uploads` | Get a presigned upload URL for a new video |
-| `POST` | `/api/jobs` | `{mediaId, factor}`: start interpolation |
-| `GET` | `/api/jobs` | The user's own videos (paginated) |
-| `GET` | `/api/jobs/{id}` | Status and progress |
-| `GET` | `/api/jobs/{id}/events` | SSE stream for that one job |
-| `GET` | `/api/jobs/{id}/download` | Redirect to a signed CDN URL |
-| `POST` | `/api/jobs/{id}/cancel` | Cancel |
+| `POST` | `/api/auth/register` | `{email, password, name?}`: create an account, get a token. Guest videos move into it |
+| `POST` | `/api/auth/login` | `{email, password}`: get a token. Guest videos move into the account |
+| `POST` | `/api/jobs?factor=&mode=&preprocess=` | Upload a video (multipart `file`) and start the job |
+| `GET` | `/api/jobs` | The caller's own videos |
+| `GET` | `/api/jobs/{id}` | Status, progress and chunks |
+| `GET` | `/api/jobs/stream` | SSE: live updates for the caller's jobs |
+| `GET` | `/api/jobs/{id}/download` | The finished video (Range supported) |
+| `PATCH` | `/api/jobs/{id}/cancel` | Cancel |
 | `DELETE` | `/api/jobs/{id}` | Delete the job and its files |
 | `GET` | `/api/health` | Status of every dependency |
+| `POST` | `/internal/job-events` | job-service only (shared key): "this job changed" |
 
 ## Reliability
 
-- A worker acknowledges a chunk only **after** its output is written and DONE is published. If a worker dies, the chunk is redelivered to another one.
-- A failing chunk is retried once, then sent to a dead-letter queue and the job fails cleanly.
-- Every step can safely run twice: chunk outputs have fixed names, and duplicate progress messages are ignored.
-- Object storage lifecycle rules delete chunk scratch files after 1 day and expired results after N days.
+- A failing chunk is retried once; a second failure fails the job with a readable reason and stops its other chunks.
+- Cancelling stops the running engines (SIGTERM, then SIGKILL) and makes waiting chunks skip themselves.
+- A slow or missing BFF never slows the engine: live updates are fire-and-forget on their own thread, and the browser reloads from REST whenever it reconnects or a job changes status.
+- A chunk that runs longer than `CHUNK_TIMEOUT_MINUTES` is killed.
+- Jobs interrupted by a restart are marked failed on startup instead of staying "processing" forever.
+- Chunk outputs are written to `<name>.part` and renamed when complete, so a half-written chunk is never merged.
+
+## Run it
+
+```bash
+docker compose -f infra/docker-compose.yml up --build      # app on http://localhost:8080
+```
+
+Set `AUTH_SECRET` (signs login tokens) and `INTERNAL_KEY` (job-service to BFF) to long random values before exposing it. `ENGINE_THREADS` on job-service is how many chunks run at once.

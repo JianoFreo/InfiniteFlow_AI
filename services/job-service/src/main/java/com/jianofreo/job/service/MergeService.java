@@ -6,7 +6,6 @@ import com.jianofreo.job.dto.media.MergeRequest;
 import com.jianofreo.job.entity.Job;
 import com.jianofreo.job.entity.JobChunk;
 import com.jianofreo.job.entity.JobStatus;
-import com.jianofreo.job.messaging.MessagePublisher;
 import com.jianofreo.job.repository.JobChunkRepository;
 import com.jianofreo.job.repository.JobRepository;
 import lombok.RequiredArgsConstructor;
@@ -18,7 +17,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 
-/** Last step: ask media-service to glue the chunks together. Runs off the listener thread so progress keeps flowing. */
+/** Last step: ask media-service to glue the chunks together. Runs on its own thread so the engines can keep reporting. */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -27,7 +26,7 @@ public class MergeService {
     private final JobRepository jobRepository;
     private final JobChunkRepository jobChunkRepository;
     private final MediaClient mediaClient;
-    private final MessagePublisher messagePublisher;
+    private final JobEventPublisher jobEventPublisher;
     private final ProgressTracker progressTracker;
 
     @Async
@@ -58,7 +57,7 @@ public class MergeService {
             fresh.setFinishedAt(Instant.now());
             fresh.setUpdatedAt(Instant.now());
             Job saved = jobRepository.save(fresh);
-            messagePublisher.publishJobChanged(saved);
+            jobEventPublisher.publishJobChanged(saved);
             long tookMs = saved.getFinishedAt().toEpochMilli() - saved.getCreatedAt().toEpochMilli();
             log.info("job_completed id={} output={} total={}ms", jobId, output.getId(), tookMs);
         } catch (RuntimeException e) {
@@ -68,7 +67,7 @@ public class MergeService {
                 fresh.setErrorMessage("Merge failed: " + e.getMessage());
                 fresh.setFinishedAt(Instant.now());
                 fresh.setUpdatedAt(Instant.now());
-                messagePublisher.publishJobChanged(jobRepository.save(fresh));
+                jobEventPublisher.publishJobChanged(jobRepository.save(fresh));
             });
         } finally {
             progressTracker.clear(jobId);

@@ -1,4 +1,4 @@
-# Build context for images built from services/ (interpolation-worker)
+# Build context for images built from services/ (job-service)
 **/target
 **/__pycache__
 **/.pytest_cache

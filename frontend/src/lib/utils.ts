@@ -36,7 +36,7 @@ export const timeAgo = (iso: string, now = Date.now()) => {
   return new Date(iso).toLocaleDateString();
 };
 
-/** Stable color per engine replica name, so the chunk grid shows which replica did what. */
+/** Stable color per engine thread name, so the chunk grid shows which thread did what. */
 const WORKER_COLORS = ["#2dd4bf", "#a78bfa", "#f472b6", "#fbbf24", "#60a5fa", "#4ade80", "#fb923c", "#e879f9"];
 export const workerColor = (worker: string | null) => {
   if (!worker) return "var(--color-line-strong)";
