@@ -1,6 +1,7 @@
 import { ListVideo, UploadCloud } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
+import DitherField from "../components/Dither/DitherField";
 import ConfirmDialog from "../components/ConfirmDialog";
 import Header from "../components/Header";
 import SideBar from "../components/SideBar";
@@ -243,7 +244,8 @@ const Studio = () => {
   };
 
   return (
-    <div className="flex min-h-full">
+    <div className="relative flex min-h-full">
+      <DitherField />
       <SideBar
         navItems={navItems}
         activePage={page === "job" ? "queue" : page}
@@ -253,7 +255,7 @@ const Studio = () => {
         health={health}
       />
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="relative z-10 flex min-w-0 flex-1 flex-col">
         <Header
           {...titles[page]}
           streamState={streamState}
@@ -261,7 +263,7 @@ const Studio = () => {
           onReload={() => void loadData()}
           reloading={reloading}
         />
-        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 sm:py-8">
+        <main className={page === "upload" ? "flex-1" : "mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 sm:py-8"}>
           {page === "upload" && <UploadPage onUpload={uploadJob} />}
           {page === "queue" && (
             <QueuePage

@@ -32,18 +32,18 @@ const SideBar = ({ navItems, activePage, onNavigate, open, onClose, health }: Si
     {open && <div className="fixed inset-0 z-30 bg-black/60 lg:hidden" onClick={onClose} aria-hidden />}
     <aside
       className={cn(
-        "fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-line bg-panel transition-transform lg:static lg:translate-x-0",
+        "fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-line bg-panel transition-transform lg:sticky lg:top-0 lg:h-screen lg:translate-x-0",
         open ? "translate-x-0" : "-translate-x-full",
       )}
     >
       <div className="flex h-16 items-center justify-between px-5">
         <div className="flex items-center gap-2.5">
-          <span className="grid size-9 place-items-center rounded-xl bg-flow/15 text-flow">
+          <span className="grid size-9 place-items-center bg-ink text-canvas">
             <InfinityIcon className="size-5" strokeWidth={2.4} />
           </span>
           <div className="leading-tight">
             <p className="font-semibold tracking-tight">InfiniteFlow</p>
-            <p className="text-xs text-ink-faint">frame interpolation</p>
+            <p className="font-mono text-[10px] uppercase tracking-widest text-ink-faint">frame interpolation</p>
           </div>
         </div>
         <button className="rounded-lg p-1.5 text-ink-dim hover:bg-panel-2 lg:hidden" onClick={onClose} aria-label="Close menu">
@@ -60,7 +60,7 @@ const SideBar = ({ navItems, activePage, onNavigate, open, onClose, health }: Si
               onClick={() => onNavigate(page)}
               className={cn(
                 "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
-                active ? "bg-flow/12 text-flow" : "text-ink-dim hover:bg-panel-2 hover:text-ink",
+                active ? "bg-ink text-canvas" : "text-ink-dim hover:bg-panel-2 hover:text-ink",
               )}
             >
               <Icon className="size-4.5" />
