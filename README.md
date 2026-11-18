@@ -8,7 +8,7 @@ Upload a video, pick a factor (2x to 8x), and watch it come back smoother.
 
 Hand-written optical-flow engine powered by **Python + NumPy**. No pretrained models. No OpenCV flow.
 
-# [Landing Page](https://infiniteflow-ai.onrender.com)
+## [Landing Page](https://jianofreo.onrender.com/infiniteflow)
 
 [![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![NumPy](https://img.shields.io/badge/NumPy-Scientific_Computing-013243?style=for-the-badge&logo=numpy&logoColor=white)](https://numpy.org/)
