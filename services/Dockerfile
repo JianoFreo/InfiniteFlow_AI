@@ -1,3 +1,7 @@
+# "core" on Railway: job-service + media-service + the Python engine in ONE container,
+# because they share the /data volume and Railway can't share a volume between services.
+# Used for deployment only. Docker Compose still builds the two services separately.
+#   docker build -t infiniteflow-core services
 FROM maven:3.9-eclipse-temurin-17 AS build
 WORKDIR /build
 COPY job-service/pom.xml job-service/pom.xml
@@ -20,5 +24,5 @@ ENV ENGINE_PYTHON=/opt/engine-venv/bin/python ENGINE_DIR=/opt/engine \
 WORKDIR /app
 COPY --from=build /build/job-service/target/*.jar job.jar
 COPY --from=build /build/media-service/target/*.jar media.jar
-COPY core/start.sh start.sh
+COPY start.sh start.sh
 CMD ["bash", "start.sh"]
