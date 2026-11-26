@@ -1,0 +1,73 @@
+# Render Blueprint, free tier: three web services + Neon.
+# In Render: New -> Blueprint -> pick this repo. It asks for every value marked "sync: false".
+# All three must be public: free web services can't receive private network traffic.
+# The two Java services reject any request without INTERNAL_KEY.
+
+envVarGroups:
+  - name: infiniteflow-shared
+    envVars:
+      - key: INTERNAL_KEY
+        generateValue: true
+
+services:
+  # ---- website + API (Node), same build/start idea as TechCare
+  - type: web
+    name: infiniteflow
+    runtime: node
+    plan: free
+    buildCommand: npm run build
+    startCommand: npm run start
+    envVars:
+      - fromGroup: infiniteflow-shared
+      - { key: NODE_ENV, value: production }
+      - { key: AUTH_SECRET, generateValue: true }
+      - { key: JOB_SERVICE_URL, sync: false }   # https://<job service>.onrender.com
+      - { key: MEDIA_SERVICE_URL, sync: false } # https://<media service>.onrender.com
+      - { key: SERVICE_TIMEOUT_MS, value: "240000" }
+
+  # ---- job-service (Spring) + the Python engine
+  - type: web
+    name: infiniteflow-jobs
+    runtime: docker
+    plan: free
+    dockerfilePath: ./services/job-service/Dockerfile
+    dockerContext: ./services
+    healthCheckPath: /actuator/health
+    envVars:
+      - fromGroup: infiniteflow-shared
+      - { key: DB_URL, sync: false }            # jdbc:postgresql://HOST/jobs_db?user=...&password=...&sslmode=require
+      - { key: MEDIA_SERVICE_URL, sync: false } # https://<media service>.onrender.com
+      - { key: BFF_EVENTS_URL, sync: false }    # https://<website>.onrender.com/internal/job-events
+      - { key: KEEP_AWAKE_URLS, sync: false }   # https://<job service>.onrender.com/actuator/health,https://<media service>.onrender.com/actuator/health
+      - { key: FILE_ROOT, value: /tmp/infiniteflow }
+      # Small-machine settings: one chunk at a time, smaller motion search, low-memory encoder
+      - { key: ENGINE_THREADS, value: "1" }
+      - { key: CHUNK_SECONDS, value: "1" }
+      - { key: FLOW_PRESET, value: fast }
+      - { key: FLOW_MAX_SIDE, value: "320" }
+      - { key: X264_PRESET, value: ultrafast }
+      - { key: OPENBLAS_NUM_THREADS, value: "1" }
+      - { key: MALLOC_ARENA_MAX, value: "2" }
+      - { key: MAX_ACTIVE_USER_JOBS, value: "1" }
+      - { key: DB_POOL_SIZE, value: "3" }
+      - key: JAVA_TOOL_OPTIONS # keeps Java small, so Python and FFmpeg fit next to it
+        value: -Xms32m -Xmx96m -Xss512k -XX:+UseSerialGC -XX:ReservedCodeCacheSize=48m -XX:TieredStopAtLevel=1
+
+  # ---- media-service (Spring): the video files
+  - type: web
+    name: infiniteflow-media
+    runtime: docker
+    plan: free
+    dockerfilePath: ./services/media-service/Dockerfile
+    dockerContext: ./services/media-service
+    healthCheckPath: /actuator/health
+    envVars:
+      - fromGroup: infiniteflow-shared
+      - { key: DB_URL, sync: false }            # jdbc:postgresql://HOST/media_db?user=...&password=...&sslmode=require
+      - { key: FILE_ROOT, value: /tmp/infiniteflow }
+      - { key: MAX_UPLOAD_SIZE, value: 25MB }
+      - { key: MAX_VIDEO_PIXELS, value: "409920" } # 854 x 480
+      - { key: DB_POOL_SIZE, value: "3" }
+      - { key: MALLOC_ARENA_MAX, value: "2" }
+      - key: JAVA_TOOL_OPTIONS
+        value: -Xms32m -Xmx128m -Xss512k -XX:+UseSerialGC -XX:ReservedCodeCacheSize=48m -XX:TieredStopAtLevel=1

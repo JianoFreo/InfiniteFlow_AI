@@ -15,7 +15,7 @@ vi.mock("../../clients/jobService.client.js", () => ({
   },
 }));
 vi.mock("../../clients/mediaService.client.js", () => ({
-  mediaService: { uploadStream: vi.fn(), streamContent: vi.fn(), deleteMedia: vi.fn(), health: vi.fn() },
+  mediaService: { wake: vi.fn(), uploadStream: vi.fn(), streamContent: vi.fn(), deleteMedia: vi.fn(), health: vi.fn() },
 }));
 
 const { jobService } = await import("../../clients/jobService.client.js");

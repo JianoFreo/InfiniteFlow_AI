@@ -2,7 +2,8 @@
 #
 #   browser ─► frontend (nginx :8080) ─► backend / BFF (:5000)
 #                                          ├─► job-service   (Spring, :8081) ─► jobs_db
-#                                          └─► media-service (Spring, :8082) ─► media_db + /data
+#                                          └─► media-service (Spring, :8082) ─► media_db + its own /data
+#   No shared disk: job-service downloads the source and uploads the chunks over HTTP.
 #   job-service splits a video into chunks and runs them on its own thread pool:
 #                                          └─ per chunk: python -m app.run_chunk  (NumPy math, stdin/stdout only)
 #   job-service ─(HTTP, after every change)─► BFF ─(SSE)─► browser     live progress, no polling
@@ -38,6 +39,7 @@ services:
     environment:
       DB_URL: jdbc:postgresql://postgres:5432/media_db?user=app&password=app
       FILE_ROOT: /data
+      INTERNAL_KEY: ${INTERNAL_KEY:-change-me-too}
     volumes:
       - data:/data
     depends_on:
@@ -70,7 +72,7 @@ services:
       FLOW_PRESET: medium
       FLOW_MAX_SIDE: "640"
     volumes:
-      - data:/data
+      - job-data:/data # its own scratch space
     depends_on:
       postgres:
         condition: service_healthy
@@ -113,3 +115,4 @@ services:
 volumes:
   pgdata:
   data:
+  job-data:

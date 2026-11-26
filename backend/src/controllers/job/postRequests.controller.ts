@@ -26,6 +26,7 @@ export const addJob = async (
 
   let mediaId: number;
   try {
+    await mediaService.wake();
     const media = await mediaService.uploadStream(req, contentType, req.headers["content-length"]);
     mediaId = media.id;
   } catch (err) {

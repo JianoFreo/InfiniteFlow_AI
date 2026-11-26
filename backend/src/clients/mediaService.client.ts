@@ -5,7 +5,10 @@ import { ENV } from "../config/env.js";
 import type { ServiceMedia } from "../controllers/job/dto/shared.dto.js";
 
 /** media-service (Spring Boot): owns the video files. */
-export const mediaServiceApi = axios.create({ baseURL: ENV.MEDIA_SERVICE_URL });
+export const mediaServiceApi = axios.create({
+  baseURL: ENV.MEDIA_SERVICE_URL,
+  headers: { "x-internal-key": ENV.INTERNAL_KEY },
+});
 
 export const mediaService = {
   /**
@@ -37,8 +40,13 @@ export const mediaService = {
     await mediaServiceApi.delete(`/media/${mediaId}`);
   },
 
+  /** Waits until media-service answers. An upload can't be replayed, so never stream it to a sleeping service. */
+  async wake() {
+    await mediaServiceApi.get("/actuator/health", { timeout: ENV.SERVICE_TIMEOUT_MS });
+  },
+
   async health() {
-    const { data } = await mediaServiceApi.get<{ status: string }>("/actuator/health", { timeout: 3_000 });
+    const { data } = await mediaServiceApi.get<{ status: string }>("/actuator/health", { timeout: ENV.HEALTH_TIMEOUT_MS });
     return data.status;
   },
 };
