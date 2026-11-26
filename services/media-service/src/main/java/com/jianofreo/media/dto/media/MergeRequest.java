@@ -17,9 +17,9 @@ public class MergeRequest {
     private Integer jobId;
     @NotNull
     private Integer sourceMediaId;
-    /** Chunk files in playback order. */
+    /** Numbers of the uploaded chunks, in playback order. */
     @NotEmpty
-    private List<String> chunkPaths;
+    private List<Integer> chunkIndexes;
     /** Name for the merged file, e.g. "clip_4x.mp4". */
     private String outputFileName;
 }

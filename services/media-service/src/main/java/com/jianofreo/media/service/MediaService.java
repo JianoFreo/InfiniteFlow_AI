@@ -10,6 +10,7 @@ import com.jianofreo.media.exception.ApiException;
 import com.jianofreo.media.repository.MediaFileRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,8 +18,10 @@ import org.springframework.util.FileSystemUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -32,6 +35,9 @@ public class MediaService {
     private final MediaFileRepository mediaFileRepository;
     private final FfmpegService ffmpegService;
     private final StorageProperties storage;
+
+    @Value("${app.max-video-pixels:0}")
+    private long maxVideoPixels;
 
     public MediaResponse upload(MultipartFile file) {
         if (file == null || file.isEmpty()) {
@@ -53,6 +59,11 @@ public class MediaService {
         } catch (RuntimeException e) {
             deleteQuietly(target);
             throw new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "This file is not a readable video");
+        }
+        if (maxVideoPixels > 0 && (long) probe.getWidth() * probe.getHeight() > maxVideoPixels) {
+            deleteQuietly(target);
+            throw new ApiException(HttpStatus.UNPROCESSABLE_CONTENT, "This video's resolution ("
+                    + probe.getWidth() + "x" + probe.getHeight() + ") is too large for this server");
         }
         if (probe.getFrameCount() < 2) {
             deleteQuietly(target);
@@ -80,11 +91,8 @@ public class MediaService {
         Path jobDir = storage.jobDir(request.getJobId()).normalize();
 
         List<Path> chunks = new ArrayList<>();
-        for (String raw : request.getChunkPaths()) {
-            Path chunk = Path.of(raw).toAbsolutePath().normalize();
-            if (!chunk.startsWith(jobDir)) {
-                throw ApiException.badRequest("Chunk path is outside the job folder: " + raw);
-            }
+        for (Integer index : request.getChunkIndexes()) {
+            Path chunk = chunkFile(request.getJobId(), index);
             // An empty chunk is normal: it happens when the real frame count was a bit lower than the estimate.
             if (Files.isRegularFile(chunk) && sizeOf(chunk) > 0) {
                 chunks.add(chunk);
@@ -115,6 +123,27 @@ public class MediaService {
         log.info("media_merged job={} chunks={} output={} took={}ms", request.getJobId(), chunks.size(),
                 saved.getId(), System.currentTimeMillis() - started);
         return toResponse(saved);
+    }
+
+    /** Saves one processed chunk sent by job-service. Written to .part first, so a cut-off upload is never merged. */
+    public void saveChunk(Integer jobId, int chunkIndex, InputStream body) {
+        Path target = chunkFile(jobId, chunkIndex);
+        Path part = target.resolveSibling(target.getFileName() + ".part");
+        try {
+            Files.createDirectories(target.getParent());
+            Files.copy(body, part, StandardCopyOption.REPLACE_EXISTING);
+            Files.move(part, target, StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException e) {
+            deleteQuietly(part);
+            throw new IllegalStateException("Could not store chunk " + chunkIndex, e);
+        }
+    }
+
+    private Path chunkFile(Integer jobId, Integer chunkIndex) {
+        if (chunkIndex == null || chunkIndex < 0) {
+            throw ApiException.badRequest("Invalid chunk number");
+        }
+        return storage.jobDir(jobId).normalize().resolve(String.format("chunk_%05d.mp4", chunkIndex));
     }
 
     @Transactional

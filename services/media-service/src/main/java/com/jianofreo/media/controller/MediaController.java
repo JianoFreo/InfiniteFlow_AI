@@ -3,7 +3,9 @@ package com.jianofreo.media.controller;
 import com.jianofreo.media.dto.media.MediaResponse;
 import com.jianofreo.media.dto.media.MergeRequest;
 import com.jianofreo.media.entity.MediaFile;
+import com.jianofreo.media.exception.ApiException;
 import com.jianofreo.media.service.MediaService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.FileSystemResource;
@@ -16,9 +18,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.nio.file.Path;
 
-/** Internal API. Only the BFF (uploads/downloads) and job-service (merge/cleanup) call it. */
+/** Internal API. Only the BFF (uploads/downloads) and job-service (chunks/merge/cleanup) call it, with the key. */
 @RestController
 @RequestMapping("media")
 @RequiredArgsConstructor
@@ -42,11 +45,23 @@ public class MediaController {
     public ResponseEntity<Resource> getContent(@PathVariable Integer id) {
         MediaFile media = mediaService.findMedia(id);
         Resource resource = new FileSystemResource(Path.of(media.getStoredPath()));
+        if (!resource.exists()) {
+            // Free hosting has no permanent disk: a sleep or redeploy erases the files but not the database rows
+            throw ApiException.notFound("This video file is no longer on the server. Please upload it again.");
+        }
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType("video/mp4"))
                 .header(HttpHeaders.CONTENT_DISPOSITION,
                         ContentDisposition.inline().filename(media.getFileName()).build().toString())
                 .body(resource);
+    }
+
+    /** The raw bytes of one processed chunk. */
+    @PutMapping("workdirs/{jobId}/chunks/{chunkIndex}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void saveChunk(@PathVariable Integer jobId, @PathVariable int chunkIndex, HttpServletRequest request)
+            throws IOException {
+        mediaService.saveChunk(jobId, chunkIndex, request.getInputStream());
     }
 
     @PostMapping("merge")
