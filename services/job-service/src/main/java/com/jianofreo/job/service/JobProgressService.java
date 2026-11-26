@@ -37,6 +37,7 @@ public class JobProgressService {
     private final JobEventPublisher jobEventPublisher;
     private final MergeService mergeService;
     private final MediaClient mediaClient;
+    private final LocalFiles localFiles;
 
     /** A chunk is about to run. Returns false when its job was cancelled, failed or deleted in the meantime. */
     public synchronized boolean chunkStarted(ChunkTask task, String engineName) {
@@ -135,6 +136,7 @@ public class JobProgressService {
             jobEventPublisher.publishJobChanged(jobRepository.save(job));
             progressTracker.clear(job.getId());
             mediaClient.deleteWorkdirQuietly(job.getId());
+            localFiles.deleteJobQuietly(job.getId());
             log.warn("job_failed id={} reason={}", job.getId(), job.getErrorMessage());
             return null;
         });

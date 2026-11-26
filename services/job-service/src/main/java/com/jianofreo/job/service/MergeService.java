@@ -13,9 +13,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+import java.io.File;
+import java.nio.file.Path;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 
 /** Last step: ask media-service to glue the chunks together. Runs on its own thread so the engines can keep reporting. */
 @Slf4j
@@ -28,6 +30,7 @@ public class MergeService {
     private final MediaClient mediaClient;
     private final JobEventPublisher jobEventPublisher;
     private final ProgressTracker progressTracker;
+    private final LocalFiles localFiles;
 
     @Async
     public void mergeAsync(Integer jobId) {
@@ -36,14 +39,12 @@ public class MergeService {
             return;
         }
 
-        List<String> chunkPaths = jobChunkRepository.findByJob_IdOrderByChunkIndexAsc(jobId).stream()
-                .map(JobChunk::getOutputPath)
-                .filter(Objects::nonNull)
-                .toList();
+        List<JobChunk> chunks = jobChunkRepository.findByJob_IdOrderByChunkIndexAsc(jobId);
 
         try {
+            List<Integer> uploaded = uploadChunks(jobId, chunks);
             MediaResponse output = mediaClient.merge(
-                    new MergeRequest(jobId, job.getSourceMediaId(), chunkPaths, outputName(job)));
+                    new MergeRequest(jobId, job.getSourceMediaId(), uploaded, outputName(job)));
 
             Job fresh = jobRepository.findById(jobId).orElse(null);
             if (fresh == null || fresh.getStatus() != JobStatus.MERGING) {
@@ -69,9 +70,24 @@ public class MergeService {
                 fresh.setUpdatedAt(Instant.now());
                 jobEventPublisher.publishJobChanged(jobRepository.save(fresh));
             });
+            mediaClient.deleteWorkdirQuietly(jobId);
         } finally {
             progressTracker.clear(jobId);
+            localFiles.deleteJobQuietly(jobId);
         }
+    }
+
+    /** Sends the processed chunks to media-service and returns their numbers in playback order. */
+    private List<Integer> uploadChunks(Integer jobId, List<JobChunk> chunks) {
+        List<Integer> uploaded = new ArrayList<>();
+        for (JobChunk chunk : chunks) {
+            // A missing or empty chunk is normal: the real frame count can be a bit lower than the estimate
+            if (chunk.getOutputPath() != null && new File(chunk.getOutputPath()).length() > 0) {
+                mediaClient.uploadChunk(jobId, chunk.getChunkIndex(), Path.of(chunk.getOutputPath()));
+                uploaded.add(chunk.getChunkIndex());
+            }
+        }
+        return uploaded;
     }
 
     private static String outputName(Job job) {

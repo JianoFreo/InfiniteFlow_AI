@@ -12,6 +12,6 @@ import java.util.List;
 public class MergeRequest {
     private Integer jobId;
     private Integer sourceMediaId;
-    private List<String> chunkPaths;
+    private List<Integer> chunkIndexes;
     private String outputFileName;
 }
