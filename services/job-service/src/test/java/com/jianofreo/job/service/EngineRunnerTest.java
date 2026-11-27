@@ -68,7 +68,7 @@ class EngineRunnerTest {
     }
 
     private EngineRunner runner() {
-        AppProperties props = new AppProperties("http://unused", "/data", 2, "http://unused", "k", PYTHON, engineDir.toString(), 1, 0, 30, 1, 1, 5);
+        AppProperties props = new AppProperties("http://unused", "/data", 2, "http://unused", "k", PYTHON, engineDir.toString(), 1, 0, 30, 1);
         runner = new EngineRunner(props, JsonMapper.builder().build());
         return runner;
     }

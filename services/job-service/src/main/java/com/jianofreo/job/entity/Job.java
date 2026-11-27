@@ -66,4 +66,8 @@ public class Job {
     /** Who owns the job: "u:<userId>" for an account, "g:<guestId>" for a guest browser. */
     @Column(length = 64)
     private String ownerId;
+
+    /** Hash of the uploader's IP (from the BFF). Guests are rate limited by this too, not only by their browser id. */
+    @Column(length = 64)
+    private String clientKey;
 }

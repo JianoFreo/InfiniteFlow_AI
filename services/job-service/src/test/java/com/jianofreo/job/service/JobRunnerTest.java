@@ -22,7 +22,7 @@ class JobRunnerTest {
     private final EngineRunner engineRunner = mock(EngineRunner.class);
     private final JobProgressService progress = mock(JobProgressService.class);
     private final AppProperties props =
-            new AppProperties("http://media", "/data", 2, "http://bff", "k", "python", ".", 1, 0, 30, 1, 1, 5);
+            new AppProperties("http://media", "/data", 2, "http://bff", "k", "python", ".", 1, 0, 30, 1);
 
     private final ChunkTask task = new ChunkTask(7, 3, "/data/in.mp4", 144, 48, false, 4, "flow", "24/1",
             1280, 720, "/tmp/infiniteflow-test-chunk_00003.mp4", null);

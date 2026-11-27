@@ -8,14 +8,17 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.util.Map;
 
-/** Every error leaves this service as { "message": "..." }, the same shape the BFF uses. */
+/** Every error leaves this service as { "message": "...", "code"?: "..." }, the same shape the BFF uses. */
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(ApiException.class)
     public ResponseEntity<Map<String, String>> handleApi(ApiException ex) {
-        return ResponseEntity.status(ex.getStatus()).body(Map.of("message", ex.getMessage()));
+        Map<String, String> body = ex.getCode() == null
+                ? Map.of("message", ex.getMessage())
+                : Map.of("message", ex.getMessage(), "code", ex.getCode());
+        return ResponseEntity.status(ex.getStatus()).body(body);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
