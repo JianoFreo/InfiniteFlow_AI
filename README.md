@@ -48,7 +48,17 @@ Hand-written optical-flow engine powered by **Python + NumPy**. No pretrained mo
 3. Watch the progress, then preview and download the result.
 4. Every video becomes an entry in the sidebar history, like chats in ChatGPT.
 
-**Guests vs accounts.** A guest can run one video at a time and keeps the history in that browser. Signing up (optional) keeps the history on every device, moves the guest videos into the account, and lets the user run several videos side by side (default 5). Limits: `MAX_ACTIVE_GUEST_JOBS`, `MAX_ACTIVE_USER_JOBS` on job-service.
+**Plans and limits.** Like an AI product, every plan has a daily allowance. Usage is counted in seconds of source video over a rolling 24 hours (failed jobs don't count, cancelled ones do). A guest keeps the history in that browser and is also counted per network address, so clearing the browser doesn't reset the allowance. Signing up keeps the history on every device and moves the guest videos into the account. **Pro** is a monthly Stripe subscription with much higher, still capped, limits.
+
+| Plan | Per day | Longest clip | Highest factor | At once |
+| --- | --- | --- | --- | --- |
+| Guest | 30 s | 10 s | 2x | 1 |
+| Free account | 3 min | 30 s | 4x | 2 |
+| Pro | 30 min | 3 min | 8x | 5 |
+
+The limits are `PLAN_*` settings on job-service (`app.plans.*`), enforced in `QuotaService`. The BFF checks the cheap ones (factor, allowance left, videos running) before the upload starts, so nobody uploads a big file only to be refused; job-service checks the clip length once media-service has probed the video.
+
+**Billing (Stripe).** Only the BFF talks to Stripe. `POST /api/billing/checkout` opens Stripe Checkout for the Pro price, `POST /api/billing/portal` opens Stripe's billing portal, and Stripe's webhook (`POST /api/billing/webhook`, signature-checked, raw body) reports subscription changes. For each event the BFF re-reads the subscription from Stripe (events can arrive out of order) and stores plan and status on the account in job-service. Pro limits apply only while the subscription is `active` or `trialing`. Without `STRIPE_SECRET_KEY` and `STRIPE_PRICE_PRO`, billing is off and everyone is guest or free. Setup: [infra/DEPLOY_AWS.md](infra/DEPLOY_AWS.md#6-stripe-optional-for-the-pro-plan).
 
 ## Stack
 
@@ -95,7 +105,7 @@ Where to read the code is in brackets.
 
 1. **Identify.** Every request carries either a login token or the browser guest id. The BFF turns that into an owner: `u:<userId>` or `g:<guestId>` [`backend/src/middlewares/identity.middleware.ts`].
 2. **Upload.** `POST /api/jobs?factor=4&mode=flow&preprocess=denoise` streams the file straight through the BFF to media-service, which stores and probes it (fps, frames, size, audio) [`backend/src/controllers/job/postRequests.controller.ts`].
-3. **Create the job.** The BFF asks job-service to create the job. job-service first checks the per-person limit (guest 1, account 5), then plans chunks of about 2 seconds [`services/job-service/.../service/JobService.java`, `ChunkPlanner.java`].
+3. **Create the job.** The BFF asks job-service to create the job. job-service first checks the plan limits (videos running, factor, clip length, what is left of today's allowance), then plans chunks of about 2 seconds [`services/job-service/.../service/JobService.java`, `ChunkPlanner.java`].
 4. **Run the chunks.** `JobRunner` hands one task per chunk to the thread pool. Each free thread starts `python -m app.run_chunk` for its chunk, sends the task as JSON on stdin and reads progress lines from stdout. A failing chunk is retried once, then the job fails [`JobRunner.java`, `EngineRunner.java`].
 5. **Track progress.** After every change (`chunkStarted`, `chunkProgress`, `chunkDone`, `chunkFailed`) `JobProgressService` updates the database and tells the BFF [`JobProgressService.java`, `JobEventPublisher.java`].
 6. **Live update.** job-service posts the event to the BFF (`POST /internal/job-events`, protected by a shared key). The BFF's SSE hub forwards it only to the browsers of that job owner [`backend/src/services/job-sse/`].
@@ -214,6 +224,10 @@ Every `/api/jobs` call needs identity: `Authorization: Bearer <token>` or `X-Gue
 | `GET` | `/api/jobs/{id}/download` | The finished video (Range supported) |
 | `PATCH` | `/api/jobs/{id}/cancel` | Cancel |
 | `DELETE` | `/api/jobs/{id}` | Delete the job and its files |
+| `GET` | `/api/usage` | The caller's plan, today's usage and every plan's limits |
+| `POST` | `/api/billing/checkout` | Account only: `{url}` of a Stripe Checkout page for Pro |
+| `POST` | `/api/billing/portal` | Account only: `{url}` of Stripe's billing portal |
+| `POST` | `/api/billing/webhook` | Stripe only (signed): subscription changes |
 | `GET` | `/api/health` | Status of every dependency |
 | `POST` | `/internal/job-events` | job-service only (shared key): "this job changed" |
 
