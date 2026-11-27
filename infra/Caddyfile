@@ -1,0 +1,6 @@
+{$DOMAIN} {
+	reverse_proxy frontend:80 {
+		# pass live progress (SSE) through immediately
+		flush_interval -1
+	}
+}

@@ -24,7 +24,7 @@ class JobServiceLimitTest {
     private final AppProperties props =
             new AppProperties("http://media", "/data", 2, "http://bff", "k", "python", ".", 2, 500, 30, 10, 1, 5);
     private final JobService service = new JobService(jobRepository, mock(JobChunkRepository.class), mediaClient,
-            mock(JobEventPublisher.class), mock(JobRunner.class), mock(ProgressTracker.class), props, mock(LocalFiles.class));
+            mock(JobEventPublisher.class), mock(JobRunner.class), mock(ProgressTracker.class), props);
 
     private static JobRequest request(String owner) {
         return new JobRequest(1, 4, "flow", null, owner);

@@ -12,10 +12,7 @@ public class RestClientConfig {
 
     @Bean
     public RestClient mediaRestClient(AppProperties props) {
-        return RestClient.builder()
-                .baseUrl(props.mediaServiceUrl())
-                .defaultHeader("X-Internal-Key", props.internalKey())
-                .build();
+        return RestClient.builder().baseUrl(props.mediaServiceUrl()).build();
     }
 
     /** Short timeouts: a slow or missing BFF must never slow the engine down. */

@@ -38,18 +38,16 @@ public class JobRunner {
     private final EngineRunner engineRunner;
     private final JobProgressService jobProgressService;
     private final AppProperties props;
-    private final LocalFiles localFiles;
 
     /** Jobs cancelled recently, so chunks still waiting in the pool skip themselves. */
     private final Map<Integer, Instant> cancelled = new ConcurrentHashMap<>();
 
     public JobRunner(ExecutorService chunkExecutor, EngineRunner engineRunner,
-                     JobProgressService jobProgressService, AppProperties props, LocalFiles localFiles) {
+                     JobProgressService jobProgressService, AppProperties props) {
         this.chunkExecutor = chunkExecutor;
         this.engineRunner = engineRunner;
         this.jobProgressService = jobProgressService;
         this.props = props;
-        this.localFiles = localFiles;
     }
 
     public void start(List<ChunkTask> tasks) {
@@ -80,7 +78,7 @@ public class JobRunner {
             long started = System.nanoTime();
             String lastError = null;
             for (int attempt = 1; attempt <= ATTEMPTS; attempt++) {
-                EngineResult result = runEngine(task);
+                EngineResult result = engineRunner.run(task, throttled(task));
 
                 if (result.status() == EngineResult.Status.DONE) {
                     jobProgressService.chunkDone(task, result.framesDone(), result.outputPath());
@@ -105,16 +103,6 @@ public class JobRunner {
             jobProgressService.chunkFailed(task, "internal error: " + e.getMessage());
             cancel(jobId);
         }
-    }
-
-    /** Gets the source video onto this machine, then runs the engine. A failed download is a failed attempt. */
-    private EngineResult runEngine(ChunkTask task) {
-        try {
-            localFiles.ensureSource(task);
-        } catch (RuntimeException e) {
-            return EngineResult.failed("could not download the source video: " + e.getMessage());
-        }
-        return engineRunner.run(task, throttled(task));
     }
 
     /** The engine reports after every frame pair; only pass one report on per progress interval. */

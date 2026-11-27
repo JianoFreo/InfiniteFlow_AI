@@ -1,6 +1,5 @@
 package com.jianofreo.job.dto.engine;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -29,7 +28,4 @@ public class ChunkTask {
     private String outputPath;
     /** Comma-separated pre-processing steps (denoise, deband, sharpen), or null for none. */
     private String preprocess;
-    /** Used by Java to download the source video. Not sent to Python. */
-    @JsonIgnore
-    private Integer sourceMediaId;
 }

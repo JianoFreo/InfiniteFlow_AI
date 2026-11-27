@@ -42,7 +42,6 @@ public class JobService {
     private final JobRunner jobRunner;
     private final ProgressTracker progressTracker;
     private final AppProperties props;
-    private final LocalFiles localFiles;
 
     /**
      * 1. ask media-service what the source video is (fps, frames, size)
@@ -84,10 +83,9 @@ public class JobService {
 
         List<ChunkTask> tasks = new ArrayList<>();
         for (ChunkPlanner.ChunkPlan plan : plans) {
-            tasks.add(new ChunkTask(saved.getId(), plan.index(), enginePath(localFiles.sourcePath(saved.getId())),
+            tasks.add(new ChunkTask(saved.getId(), plan.index(), media.getPath(),
                     plan.startFrame(), plan.frameCount(), plan.last(), saved.getFactor(), mode,
-                    media.getFps(), media.getWidth(), media.getHeight(),
-                    enginePath(localFiles.chunkPath(saved.getId(), plan.index())), preprocess, media.getId()));
+                    media.getFps(), media.getWidth(), media.getHeight(), chunkOutputPath(saved.getId(), plan.index()), preprocess));
         }
         jobRunner.start(tasks);
         jobEventPublisher.publishJobChanged(saved);
@@ -115,7 +113,6 @@ public class JobService {
      */
     @EventListener(ApplicationReadyEvent.class)
     public void failInterruptedJobs() {
-        localFiles.deleteAllQuietly();
         for (Job job : jobRepository.findByStatusIn(ACTIVE)) {
             job.setStatus(JobStatus.FAILED);
             job.setErrorMessage("Interrupted by a restart. Please upload the video again.");
@@ -163,7 +160,6 @@ public class JobService {
                 jobEventPublisher.publishJobChanged(saved);
                 progressTracker.clear(id);
                 mediaClient.deleteWorkdirQuietly(id);
-                localFiles.deleteJobQuietly(id);
                 log.info("job_cancelled id={}", id);
                 return JobMapper.toResponse(saved);
             } catch (ObjectOptimisticLockingFailureException e) {
@@ -180,7 +176,6 @@ public class JobService {
         mediaClient.deleteMediaQuietly(job.getSourceMediaId());
         mediaClient.deleteMediaQuietly(job.getOutputMediaId());
         mediaClient.deleteWorkdirQuietly(id);
-        localFiles.deleteJobQuietly(id);
         jobChunkRepository.deleteByJob_Id(id);
         jobRepository.deleteById(id);
         progressTracker.clear(id);
@@ -202,7 +197,8 @@ public class JobService {
         return jobRepository.findById(id).orElseThrow(() -> ApiException.notFound("Job " + id + " not found"));
     }
 
-    private static String enginePath(Path path) {
-        return path.toString().replace('\\', '/');
+    private String chunkOutputPath(Integer jobId, int chunkIndex) {
+        return Path.of(props.storageRoot(), "jobs", String.valueOf(jobId), String.format("chunk_%05d.mp4", chunkIndex))
+                .toString().replace('\\', '/');
     }
 }

@@ -6,7 +6,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * Everything in application.properties that starts with "app.".
  *
  * @param mediaServiceUrl       base URL of media-service, e.g. http://media-service:8082
- * @param storageRoot           local scratch folder; the source copy and chunks go to {storageRoot}/jobs/{jobId}/
+ * @param storageRoot           the shared volume root; chunk outputs go to {storageRoot}/jobs/{jobId}/
  * @param chunkSeconds          how much video one engine run covers. Smaller = more parallelism, more overhead.
  * @param bffEventsUrl          where job changes are pushed so the BFF can show them live
  * @param internalKey           shared secret sent with those pushes (the BFF rejects requests without it)

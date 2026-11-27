@@ -9,11 +9,7 @@ export interface ServiceUser {
 }
 
 /** job-service (Spring Boot): owns job state. The BFF never touches its database directly. */
-export const jobServiceApi = axios.create({
-  baseURL: ENV.JOB_SERVICE_URL,
-  timeout: ENV.SERVICE_TIMEOUT_MS,
-  headers: { "x-internal-key": ENV.INTERNAL_KEY },
-});
+export const jobServiceApi = axios.create({ baseURL: ENV.JOB_SERVICE_URL, timeout: 15_000 });
 
 export const jobService = {
   async createJob(body: { sourceMediaId: number; factor: number; mode: string; preprocess?: string; ownerId: string }) {
@@ -56,7 +52,7 @@ export const jobService = {
     return data.moved;
   },
   async health() {
-    const { data } = await jobServiceApi.get<{ status: string }>("/actuator/health", { timeout: ENV.HEALTH_TIMEOUT_MS });
+    const { data } = await jobServiceApi.get<{ status: string }>("/actuator/health", { timeout: 3_000 });
     return data.status;
   },
 };
