@@ -1,0 +1,76 @@
+# Production extras for one server (Oracle Cloud Always Free), used ON TOP of docker-compose.yml:
+#
+#   docker compose -f infra/docker-compose.yml -f infra/docker-compose.prod.yml up -d --build
+#
+# What changes: databases on Neon, real secrets, and only HTTPS (Caddy) is open to the internet.
+# Values come from infra/.env (copy infra/.env.example). Needs Docker Compose 2.24 or newer.
+
+x-logging: &logging
+  driver: json-file
+  options: { max-size: "10m", max-file: "3" } # logs must not fill the free disk
+
+# Let Neon sleep when nobody uses the app (the free plan has limited compute hours)
+x-neon: &neon
+  # The Docker health check runs every 5 s. Without this it would query the database each time.
+  MANAGEMENT_HEALTH_DB_ENABLED: "false"
+  SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE: "0"
+  SPRING_DATASOURCE_HIKARI_IDLE_TIMEOUT: "60000"
+  SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: "5"
+
+services:
+  postgres:
+    profiles: ["local-db"] # not started: Neon is the database
+
+  media-service:
+    depends_on: !reset []
+    environment:
+      <<: *neon
+      DB_URL: ${MEDIA_DB_URL:?Set MEDIA_DB_URL in infra/.env}
+      # Public site: smaller uploads, so strangers can't fill the disk quickly
+      SPRING_SERVLET_MULTIPART_MAXFILESIZE: 500MB
+      SPRING_SERVLET_MULTIPART_MAXREQUESTSIZE: 500MB
+    mem_limit: 2g
+    logging: *logging
+
+  job-service:
+    depends_on: !override
+      media-service:
+        condition: service_healthy
+    environment:
+      <<: *neon
+      DB_URL: ${JOBS_DB_URL:?Set JOBS_DB_URL in infra/.env}
+      INTERNAL_KEY: ${INTERNAL_KEY:?Set INTERNAL_KEY in infra/.env}
+    mem_limit: 6g
+    logging: *logging
+
+  backend:
+    ports: !reset [] # not reachable from the internet
+    environment:
+      INTERNAL_KEY: ${INTERNAL_KEY:?Set INTERNAL_KEY in infra/.env}
+      AUTH_SECRET: ${AUTH_SECRET:?Set AUTH_SECRET in infra/.env}
+      CORS_ORIGIN: https://${DOMAIN:?Set DOMAIN in infra/.env}
+    logging: *logging
+
+  frontend:
+    ports: !reset [] # only Caddy talks to it
+    restart: unless-stopped
+    logging: *logging
+
+  # The only public door. Gets and renews a free HTTPS certificate for DOMAIN by itself.
+  caddy:
+    image: caddy:2-alpine
+    environment:
+      DOMAIN: ${DOMAIN:?Set DOMAIN in infra/.env}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+    depends_on:
+      - frontend
+    restart: unless-stopped
+    logging: *logging
+
+volumes:
+  caddy-data:
