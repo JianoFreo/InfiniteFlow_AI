@@ -6,6 +6,7 @@ import type { SettingsTab } from "./SettingsModal";
 interface AccountMenuProps {
   user: AuthUser | null;
   onSettings: (tab: SettingsTab) => void;
+  onPlans: () => void;
   onLogin: () => void;
   onRegister: () => void;
   onLogout: () => void;
@@ -13,8 +14,8 @@ interface AccountMenuProps {
 
 const item = "block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-panel-2";
 
-/** Bottom-left account row, like ChatGPT: click it for Settings, About and log in / out. */
-const AccountMenu = ({ user, onSettings, onLogin, onRegister, onLogout }: AccountMenuProps) => {
+/** Bottom-left account row, like ChatGPT: click it for Settings, Plans, About and log in / out. */
+const AccountMenu = ({ user, onSettings, onPlans, onLogin, onRegister, onLogout }: AccountMenuProps) => {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -40,6 +41,9 @@ const AccountMenu = ({ user, onSettings, onLogin, onRegister, onLogout }: Accoun
           {user && <p className="truncate px-3 py-2 text-xs text-ink-faint">{user.email}</p>}
           <button className={item} onClick={choose(() => onSettings("general"))}>
             Settings
+          </button>
+          <button className={item} onClick={choose(onPlans)}>
+            Plans
           </button>
           <button className={item} onClick={choose(() => onSettings("about"))}>
             About

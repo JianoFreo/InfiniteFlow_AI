@@ -5,7 +5,9 @@ import ConfirmDialog from "../components/ConfirmDialog";
 import AccountMenu from "../components/AccountMenu";
 import AuthModal from "../components/AuthModal";
 import type { AuthMode } from "../components/AuthModal";
+import PlansModal from "../components/PlansModal";
 import SettingsModal from "../components/SettingsModal";
+import UsageMeter from "../components/UsageMeter";
 import type { SettingsTab } from "../components/SettingsModal";
 import SideBar from "../components/SideBar";
 import SpaceBackground from "../components/SpaceBackground";
@@ -14,9 +16,11 @@ import type { ToastMessage } from "../components/Toast";
 import type { UploadProgressInfo } from "../components/Upload/UploadForm";
 import { isActive } from "../interface/Job";
 import type { Job, JobChangeEvent, JobDetail, JobMode, PreprocessStep } from "../interface/Job";
+import { LIMIT_CODES } from "../interface/Usage";
 import { useAuth } from "../lib/auth";
-import { api, errorMessage } from "../lib/axios";
+import { api, errorCode, errorMessage } from "../lib/axios";
 import { useSettings } from "../lib/settings";
+import { useUsage } from "../lib/usage";
 import { connectJobStream } from "../services/job-sse/connectJobStream";
 import type { StreamState } from "../services/job-sse/connectJobStream";
 import JobDetailsPage from "./JobDetailsPage";
@@ -32,8 +36,11 @@ const DETAIL_REFRESH_MS = 1000;
 const Studio = () => {
   const { user, owner, logout } = useAuth();
   const { settings, resolvedTheme } = useSettings();
+  const { refresh: refreshUsage } = useUsage();
   const [settingsTab, setSettingsTab] = useState<SettingsTab | null>(null);
   const [authMode, setAuthMode] = useState<AuthMode | null>(null);
+  /** Null = closed. reason = the limit that was just hit, shown at the top of the dialog. */
+  const [plans, setPlans] = useState<{ reason: string | null } | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const rawPage = searchParams.get("page") as Page | null;
   const jobId = Number(searchParams.get("id")) || null;
@@ -73,6 +80,37 @@ const Studio = () => {
   const detailTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const notify = useCallback((tone: ToastMessage["tone"], text: string) => setToast({ id: Date.now(), tone, text }), []);
+
+  const openPlans = useCallback((reason?: string) => {
+    setPlans({ reason: reason ?? null });
+    setSidebarOpen(false);
+  }, []);
+
+  // Back from Stripe Checkout: ?billing=success|cancel. The webhook can take a few seconds, so poll briefly.
+  // Runs once on mount (StrictMode's second run just repeats it; the cleanup stops the first poll).
+  const billingParam = useRef(searchParams.get("billing"));
+  const setSearchParamsRef = useRef(setSearchParams);
+  setSearchParamsRef.current = setSearchParams;
+  useEffect(() => {
+    const result = billingParam.current;
+    if (!result) return;
+    setSearchParamsRef.current({ page: "upload" }, { replace: true });
+    if (result === "cancel") {
+      notify("bad", "Checkout cancelled. Nothing was charged.");
+      return;
+    }
+    notify("ok", "Thanks for subscribing. Pro limits apply as soon as the payment is confirmed.");
+    let tries = 0;
+    const timer = setInterval(async () => {
+      tries += 1;
+      const usage = await refreshUsage();
+      if (usage?.plan === "pro" || tries >= 10) {
+        clearInterval(timer);
+        if (usage?.plan === "pro") notify("ok", "You're on Pro now.");
+      }
+    }, 2000);
+    return () => clearInterval(timer);
+  }, [notify, refreshUsage]);
 
   const loadJobs = useCallback(async () => {
     const { data } = await api.get<{ jobs: Job[] }>("/api/jobs", { params: { limit: 100 } });
@@ -146,9 +184,12 @@ const Studio = () => {
           }
         }
       }
-      if (needFullReload) void loadJobs().catch(() => undefined);
+      if (needFullReload) {
+        void loadJobs().catch(() => undefined);
+        void refreshUsage(); // a new or failed job changes what is left today
+      }
     },
-    [loadJobs, scheduleDetailRefresh],
+    [loadJobs, scheduleDetailRefresh, refreshUsage],
   );
 
   const handleJobEventsRef = useRef(handleJobEvents);
@@ -204,9 +245,16 @@ const Studio = () => {
       });
       setJobs((prev) => [data.job, ...prev.filter((job) => job.id !== data.job.id)]);
       notify("ok", `Started job #${data.job.id} (${data.job.chunks.total} chunks)`);
+      void refreshUsage();
       navigate("job", data.job.id);
     } catch (err) {
-      notify("bad", errorMessage(err, "Upload failed"));
+      const code = errorCode(err);
+      if (code && LIMIT_CODES.includes(code)) {
+        void refreshUsage();
+        openPlans(errorMessage(err));
+      } else {
+        notify("bad", errorMessage(err, "Upload failed"));
+      }
       throw err;
     }
   };
@@ -260,19 +308,23 @@ const Studio = () => {
         collapsed={collapsed}
         onCollapse={() => setCollapsedPersist(true)}
         footer={
-          <AccountMenu
-            user={user}
-            onSettings={(tab) => {
-              setSettingsTab(tab);
-              setSidebarOpen(false);
-            }}
-            onLogin={() => setAuthMode("login")}
-            onRegister={() => setAuthMode("register")}
-            onLogout={() => {
-              logout();
-              notify("ok", "Logged out");
-            }}
-          />
+          <>
+            <UsageMeter onPlans={() => openPlans()} />
+            <AccountMenu
+              user={user}
+              onSettings={(tab) => {
+                setSettingsTab(tab);
+                setSidebarOpen(false);
+              }}
+              onPlans={() => openPlans()}
+              onLogin={() => setAuthMode("login")}
+              onRegister={() => setAuthMode("register")}
+              onLogout={() => {
+                logout();
+                notify("ok", "Logged out");
+              }}
+            />
+          </>
         }
       />
 
@@ -286,7 +338,7 @@ const Studio = () => {
           <Menu className="size-5" strokeWidth={1.75} />
         </button>
         <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-14 sm:px-6 lg:py-8">
-          {page === "upload" && <UploadPage onUpload={uploadJob} />}
+          {page === "upload" && <UploadPage onUpload={uploadJob} onPlans={openPlans} />}
           {page === "job" && (
             <JobDetailsPage
               job={selected}
@@ -315,6 +367,20 @@ const Studio = () => {
           onClose={() => setSettingsTab(null)}
           onLogin={() => setAuthMode("login")}
           onRegister={() => setAuthMode("register")}
+          onPlans={() => {
+            setSettingsTab(null);
+            openPlans();
+          }}
+        />
+      )}
+      {plans && (
+        <PlansModal
+          reason={plans.reason}
+          onClose={() => setPlans(null)}
+          onRegister={() => {
+            setPlans(null);
+            setAuthMode("register");
+          }}
         />
       )}
       {authMode && (
