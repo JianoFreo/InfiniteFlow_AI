@@ -41,6 +41,7 @@ public class JobService {
     private final JobEventPublisher jobEventPublisher;
     private final JobRunner jobRunner;
     private final ProgressTracker progressTracker;
+    private final QuotaService quotaService;
     private final AppProperties props;
 
     /**
@@ -50,7 +51,8 @@ public class JobService {
      * 4. hand the chunks to the JobRunner: free engine threads start on them right away
      */
     public JobResponse createJob(JobRequest request) {
-        rejectIfTooManyRunning(request.getOwnerId()); // before any work: a rejected request costs nothing
+        // Plan limits before any work: a rejected request costs nothing
+        quotaService.checkRequest(request.getOwnerId(), request.getClientKey(), request.getFactor());
 
         MediaResponse media;
         try {
@@ -58,6 +60,8 @@ public class JobService {
         } catch (ResourceAccessException e) {
             throw MediaClient.unavailable(e);
         }
+        quotaService.checkVideo(request.getOwnerId(), request.getClientKey(),
+                media.getDurationMs() == null ? 0 : media.getDurationMs());
 
         String mode = request.getMode() == null ? "flow" : request.getMode();
         String preprocess = request.getPreprocess() == null || request.getPreprocess().isBlank() ? null : request.getPreprocess();
@@ -70,7 +74,7 @@ public class JobService {
                 media.getFileName(), media.getPath(), media.getFps(), media.getFpsValue(),
                 media.getWidth(), media.getHeight(), media.getFrameCount(), media.getDurationMs(),
                 media.getHasAudio(), media.getSizeBytes(), null,
-                plans.size(), 0, now, now, null, null, preprocess, request.getOwnerId());
+                plans.size(), 0, now, now, null, null, preprocess, request.getOwnerId(), request.getClientKey());
         Job saved = jobRepository.save(job);
 
         List<JobChunk> chunks = new ArrayList<>();
@@ -94,17 +98,6 @@ public class JobService {
                 saved.getId(), saved.getFileName(), saved.getFrameCount(), saved.getFactor(), mode,
                 plans.size(), framesPerChunk);
         return JobMapper.toResponse(saved);
-    }
-
-    /** Guests may run one video at a time; signed-in users several side by side. */
-    private void rejectIfTooManyRunning(String ownerId) {
-        boolean guest = ownerId.startsWith("g:");
-        int limit = guest ? props.maxActiveGuestJobs() : props.maxActiveUserJobs();
-        if (jobRepository.countByOwnerIdAndStatusIn(ownerId, ACTIVE) >= limit) {
-            throw ApiException.conflict(guest
-                    ? "You already have a video processing. Wait for it to finish, or sign up to run several at once."
-                    : "You already have " + limit + " videos processing. Wait for one to finish.");
-        }
     }
 
     /**

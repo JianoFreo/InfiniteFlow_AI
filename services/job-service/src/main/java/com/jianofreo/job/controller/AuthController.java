@@ -1,5 +1,6 @@
 package com.jianofreo.job.controller;
 
+import com.jianofreo.job.dto.auth.BillingRequest;
 import com.jianofreo.job.dto.auth.LoginRequest;
 import com.jianofreo.job.dto.auth.RegisterRequest;
 import com.jianofreo.job.dto.auth.UserResponse;
@@ -31,5 +32,11 @@ public class AuthController {
     @GetMapping("users/{id}")
     public UserResponse get(@PathVariable Integer id) {
         return authService.get(id);
+    }
+
+    /** Called by the BFF's Stripe webhook handler. */
+    @PutMapping("users/{id}/billing")
+    public UserResponse updateBilling(@PathVariable Integer id, @Valid @RequestBody BillingRequest request) {
+        return authService.updateBilling(id, request);
     }
 }

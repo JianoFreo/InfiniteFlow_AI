@@ -6,14 +6,60 @@ export interface ServiceUser {
   id: number;
   email: string;
   name: string | null;
+  plan?: "free" | "pro";
+  stripeCustomerId?: string | null;
+}
+
+export interface PlanLimits {
+  dailySeconds: number;
+  maxClipSeconds: number;
+  maxFactor: number;
+  maxActive: number;
+}
+
+export type PlanName = "guest" | "free" | "pro";
+
+export interface ServiceUsage {
+  plan: PlanName;
+  limits: PlanLimits;
+  usedSeconds: number;
+  remainingSeconds: number;
+  resetsAt: string | null;
+  activeJobs: number;
+  subscriptionStatus: string | null;
+  renewsAt: string | null;
+  plans: Record<PlanName, PlanLimits>;
+}
+
+export interface BillingUpdate {
+  stripeCustomerId: string | null;
+  stripeSubscriptionId: string | null;
+  status: string | null;
+  plan: "free" | "pro";
+  renewsAt: string | null;
 }
 
 /** job-service (Spring Boot): owns job state. The BFF never touches its database directly. */
 export const jobServiceApi = axios.create({ baseURL: ENV.JOB_SERVICE_URL, timeout: 15_000 });
 
 export const jobService = {
-  async createJob(body: { sourceMediaId: number; factor: number; mode: string; preprocess?: string; ownerId: string }) {
+  async createJob(body: {
+    sourceMediaId: number;
+    factor: number;
+    mode: string;
+    preprocess?: string;
+    ownerId: string;
+    clientKey?: string;
+  }) {
     const { data } = await jobServiceApi.post<ServiceJob>("/jobs", body);
+    return data;
+  },
+  async usage(owner: string, clientKey: string) {
+    const { data } = await jobServiceApi.get<ServiceUsage>("/usage", { params: { owner, clientKey } });
+    return data;
+  },
+  async updateBilling(userId: number, body: BillingUpdate) {
+    const { data } = await jobServiceApi.put<ServiceUser>(`/auth/users/${userId}/billing`, body);
     return data;
   },
   async listJobs(owner: string, limit: number, activeOnly: boolean) {

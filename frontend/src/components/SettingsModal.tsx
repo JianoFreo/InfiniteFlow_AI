@@ -1,6 +1,10 @@
+import { useState } from "react";
 import type { ReactNode } from "react";
 import type { JobMode, PreprocessStep } from "../interface/Job";
+import { formatSeconds, PLAN_LABEL } from "../interface/Usage";
 import { useAuth } from "../lib/auth";
+import { errorMessage } from "../lib/axios";
+import { useUsage } from "../lib/usage";
 import { useSettings } from "../lib/settings";
 import type { ThemeChoice } from "../lib/settings";
 import { cn } from "../lib/utils";
@@ -14,6 +18,7 @@ interface SettingsModalProps {
   onClose: () => void;
   onLogin: () => void;
   onRegister: () => void;
+  onPlans: () => void;
 }
 
 const TABS: Array<{ key: SettingsTab; label: string }> = [
@@ -143,7 +148,30 @@ const General = () => {
   );
 };
 
-const Account = ({ onLogin, onRegister }: Pick<SettingsModalProps, "onLogin" | "onRegister">) => {
+const PlanRow = ({ onPlans }: { onPlans: () => void }) => {
+  const { usage, openPortal } = useUsage();
+  const [error, setError] = useState<string | null>(null);
+  if (!usage) return null;
+  const hint = `${formatSeconds(usage.limits.dailySeconds)} of video a day, clips up to ${formatSeconds(usage.limits.maxClipSeconds)}, up to ${usage.limits.maxFactor}×.`;
+  return (
+    <Row title={`${PLAN_LABEL[usage.plan]} plan`} hint={error ?? hint}>
+      {usage.plan === "pro" && usage.billingEnabled ? (
+        <button
+          onClick={() => openPortal().catch((err) => setError(errorMessage(err, "Could not open billing")))}
+          className="rounded-lg border border-line-strong px-3 py-1.5 text-sm hover:bg-panel-2"
+        >
+          Manage billing
+        </button>
+      ) : (
+        <button onClick={onPlans} className="rounded-lg border border-line-strong px-3 py-1.5 text-sm hover:bg-panel-2">
+          {usage.plan === "free" && usage.billingEnabled ? "Upgrade" : "See plans"}
+        </button>
+      )}
+    </Row>
+  );
+};
+
+const Account = ({ onLogin, onRegister, onPlans }: Pick<SettingsModalProps, "onLogin" | "onRegister" | "onPlans">) => {
   const { user, logout } = useAuth();
 
   if (user) {
@@ -152,6 +180,7 @@ const Account = ({ onLogin, onRegister }: Pick<SettingsModalProps, "onLogin" | "
         <Row title="Signed in as" hint={user.name || undefined}>
           <span className="text-sm text-ink-dim">{user.email}</span>
         </Row>
+        <PlanRow onPlans={onPlans} />
         <Row title="History" hint="Your videos are saved to your account and follow you to any device.">
           <span className="text-sm text-ink-dim">Account</span>
         </Row>
@@ -172,6 +201,9 @@ const Account = ({ onLogin, onRegister }: Pick<SettingsModalProps, "onLogin" | "
           Everything works without an account. Your history is kept in this browser only, so clearing site data or
           switching devices loses it. Sign up to keep it safe and see it anywhere.
         </p>
+      </div>
+      <div className="border-y border-line">
+        <PlanRow onPlans={onPlans} />
       </div>
       <div className="flex gap-2">
         <button onClick={onRegister} className="rounded-lg bg-flow px-4 py-2 text-sm font-medium text-canvas hover:bg-flow-strong">
@@ -224,7 +256,7 @@ const About = () => (
   </div>
 );
 
-const SettingsModal = ({ tab, onTabChange, onClose, onLogin, onRegister }: SettingsModalProps) => (
+const SettingsModal = ({ tab, onTabChange, onClose, onLogin, onRegister, onPlans }: SettingsModalProps) => (
   <Modal title="Settings" onClose={onClose} wide>
     <div className="flex gap-1 border-b border-line px-4 pt-2">
       {TABS.map(({ key, label }) => (
@@ -242,7 +274,7 @@ const SettingsModal = ({ tab, onTabChange, onClose, onLogin, onRegister }: Setti
       ))}
     </div>
     {tab === "general" && <General />}
-    {tab === "account" && <Account onLogin={onLogin} onRegister={onRegister} />}
+    {tab === "account" && <Account onLogin={onLogin} onRegister={onRegister} onPlans={onPlans} />}
     {tab === "about" && <About />}
   </Modal>
 );

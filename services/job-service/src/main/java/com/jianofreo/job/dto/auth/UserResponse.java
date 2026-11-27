@@ -12,4 +12,8 @@ public class UserResponse {
     private Integer id;
     private String email;
     private String name;
+    /** "free" or "pro": the plan whose limits apply right now. */
+    private String plan;
+    /** Needed by the BFF to open Stripe's billing portal. Null until the first checkout. */
+    private String stripeCustomerId;
 }

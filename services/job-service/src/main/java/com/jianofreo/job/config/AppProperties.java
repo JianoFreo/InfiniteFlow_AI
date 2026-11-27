@@ -16,13 +16,12 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param progressIntervalMs    minimum time between two progress reports for one chunk
  * @param chunkTimeoutMinutes   a chunk running longer than this is killed and counts as failed
  * @param stopGraceSeconds      after SIGTERM, how long the engine gets to clean up before it is killed
- * @param maxActiveGuestJobs    how many videos a guest can have running at once
- * @param maxActiveUserJobs     how many videos a signed-in user can have running at once
+ *
+ * Per-plan usage limits ("app.plans.*") are in {@link PlanProperties}.
  */
 @ConfigurationProperties(prefix = "app")
 public record AppProperties(String mediaServiceUrl, String storageRoot, double chunkSeconds,
                             String bffEventsUrl, String internalKey,
                             String pythonCommand, String engineDir, int engineThreads,
-                            long progressIntervalMs, long chunkTimeoutMinutes, long stopGraceSeconds,
-                            int maxActiveGuestJobs, int maxActiveUserJobs) {
+                            long progressIntervalMs, long chunkTimeoutMinutes, long stopGraceSeconds) {
 }

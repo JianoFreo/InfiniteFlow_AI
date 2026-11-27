@@ -8,10 +8,17 @@ import org.springframework.http.HttpStatus;
 public class ApiException extends RuntimeException {
 
     private final HttpStatus status;
+    /** Optional machine-readable reason the frontend can react to, e.g. "quota_exceeded". */
+    private final String code;
 
     public ApiException(HttpStatus status, String message) {
+        this(status, null, message);
+    }
+
+    public ApiException(HttpStatus status, String code, String message) {
         super(message);
         this.status = status;
+        this.code = code;
     }
 
     public static ApiException notFound(String message) {

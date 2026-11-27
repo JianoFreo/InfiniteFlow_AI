@@ -11,6 +11,7 @@ vi.mock("../../clients/jobService.client.js", () => ({
     getChunks: vi.fn(),
     cancelJob: vi.fn(),
     deleteJob: vi.fn(),
+    usage: vi.fn(),
     health: vi.fn(),
   },
 }));
@@ -21,7 +22,7 @@ vi.mock("../../clients/mediaService.client.js", () => ({
 const { jobService } = await import("../../clients/jobService.client.js");
 const { mediaService } = await import("../../clients/mediaService.client.js");
 const { createApp } = await import("../../app.js");
-const { serviceJob } = await import("../helper/fixtures.js");
+const { serviceJob, serviceUsage } = await import("../helper/fixtures.js");
 
 const app = createApp();
 const GUEST = "test-guest-id-0001";
@@ -36,7 +37,51 @@ const serviceError = (status: number, message: string) =>
     data: { message },
   });
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  vi.mocked(jobService.usage).mockResolvedValue(serviceUsage({ plan: "pro" }));
+});
+
+describe("plan limits on upload", () => {
+  it("refuses a factor above the guest plan before uploading anything", async () => {
+    vi.mocked(jobService.usage).mockResolvedValue(serviceUsage());
+    const res = await agent.post("/api/jobs?factor=8").attach("file", Buffer.from("x"), "a.mp4");
+    expect(res.status).toBe(403);
+    expect(res.body).toMatchObject({ code: "plan_limit" });
+    expect(res.body.message).toMatch(/Sign up/);
+    expect(mediaService.uploadStream).not.toHaveBeenCalled();
+  });
+
+  it("refuses when today's allowance is used up", async () => {
+    vi.mocked(jobService.usage).mockResolvedValue(serviceUsage({ usedSeconds: 30, remainingSeconds: 0 }));
+    const res = await agent.post("/api/jobs?factor=2").attach("file", Buffer.from("x"), "a.mp4");
+    expect(res.status).toBe(429);
+    expect(res.body.code).toBe("quota_exceeded");
+    expect(mediaService.uploadStream).not.toHaveBeenCalled();
+  });
+
+  it("sends the same private client key for usage and job creation", async () => {
+    vi.mocked(mediaService.uploadStream).mockResolvedValue({ id: 3 } as never);
+    vi.mocked(jobService.createJob).mockResolvedValue(serviceJob({ status: "QUEUED", progress: 0 }));
+    await agent.post("/api/jobs?factor=2").attach("file", Buffer.from("x"), "a.mp4");
+
+    const key = vi.mocked(jobService.usage).mock.calls[0]![1];
+    expect(key).toMatch(/^[0-9a-f]{32}$/);
+    expect(vi.mocked(jobService.createJob).mock.calls[0]![0].clientKey).toBe(key);
+  });
+
+  it("passes job-service's quota code through", async () => {
+    vi.mocked(mediaService.uploadStream).mockResolvedValue({ id: 3 } as never);
+    const err = serviceError(429, "You have 5 s left today");
+    (err.response!.data as Record<string, string>).code = "quota_exceeded";
+    vi.mocked(jobService.createJob).mockRejectedValue(err);
+    vi.mocked(mediaService.deleteMedia).mockResolvedValue();
+    const res = await agent.post("/api/jobs?factor=2").attach("file", Buffer.from("x"), "a.mp4");
+    expect(res.status).toBe(429);
+    expect(res.body).toEqual({ message: "You have 5 s left today", code: "quota_exceeded" });
+    expect(mediaService.deleteMedia).toHaveBeenCalledWith(3);
+  });
+});
 
 describe("POST /api/jobs", () => {
   it("rejects a bad factor before streaming anything", async () => {
@@ -54,7 +99,9 @@ describe("POST /api/jobs", () => {
 
     expect(res.status).toBe(201);
     expect(res.body.job).toMatchObject({ id: 7, status: "queued", factor: 4 });
-    expect(jobService.createJob).toHaveBeenCalledWith({ sourceMediaId: 3, factor: 4, mode: "flow", preprocess: undefined, ownerId: `g:${GUEST}` });
+    expect(jobService.createJob).toHaveBeenCalledWith(
+      expect.objectContaining({ sourceMediaId: 3, factor: 4, mode: "flow", preprocess: undefined, ownerId: `g:${GUEST}` }),
+    );
   });
 
   it("deletes the uploaded file when job creation fails", async () => {

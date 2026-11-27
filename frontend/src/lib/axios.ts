@@ -29,4 +29,11 @@ export const errorMessage = (err: unknown, fallback = "Something went wrong") =>
   return fallback;
 };
 
-export const apiUrl = (path: string) => `${API_BASE_URL}${path}`;
+/** Plan-limit errors carry a code: "too_many_running" | "plan_limit" | "quota_exceeded". */
+export const errorCode = (err: unknown): string | null => {
+  if (!isAxiosError(err)) return null;
+  const code = (err.response?.data as { code?: unknown } | undefined)?.code;
+  return typeof code === "string" ? code : null;
+};
+
+export const apiUrl =(path: string) => `${API_BASE_URL}${path}`;

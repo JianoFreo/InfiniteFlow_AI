@@ -7,12 +7,13 @@ interface UploadPageProps {
     input: { file: File; factor: number; mode: JobMode; preprocess: PreprocessStep[] },
     onProgress: (p: UploadProgressInfo) => void,
   ) => Promise<void>;
+  onPlans: (reason?: string) => void;
 }
 
-const UploadPage = ({ onUpload }: UploadPageProps) => (
+const UploadPage = ({ onUpload, onPlans }: UploadPageProps) => (
   <div className="mx-auto max-w-2xl pt-6 sm:pt-16">
     <h1 className="mb-8 text-center text-3xl font-semibold tracking-tight">What should we smooth today?</h1>
-    <UploadForm onSubmit={onUpload} />
+    <UploadForm onSubmit={onUpload} onPlans={onPlans} />
   </div>
 );
 

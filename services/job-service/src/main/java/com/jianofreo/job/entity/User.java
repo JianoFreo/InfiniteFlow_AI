@@ -28,4 +28,20 @@ public class User {
     private String name;
 
     private Instant createdAt;
+
+    // Billing, written only by the Stripe webhook (through the BFF). A null plan means the free plan.
+    @Column(length = 20)
+    private String plan;
+    @Column(length = 64)
+    private String stripeCustomerId;
+    @Column(length = 64)
+    private String stripeSubscriptionId;
+    /** Stripe's subscription status: active, trialing, past_due, canceled... Pro limits apply only while active or trialing. */
+    @Column(length = 32)
+    private String subscriptionStatus;
+    private Instant planRenewsAt;
+
+    public User(Integer id, String email, String passwordHash, String name, Instant createdAt) {
+        this(id, email, passwordHash, name, createdAt, null, null, null, null, null);
+    }
 }

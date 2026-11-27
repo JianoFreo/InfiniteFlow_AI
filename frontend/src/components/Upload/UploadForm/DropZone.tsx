@@ -6,15 +6,20 @@ interface DropZoneProps {
   file: File | null;
   disabled: boolean;
   onFile: (file: File | null) => void;
+  /** The longest clip the current plan accepts, shown in the hint. */
+  maxClipLabel?: string;
+  /** Reports the clip length once the browser has read it, so the form can check it against the plan. */
+  onDuration?: (durationMs: number | null) => void;
 }
 
-const DropZone = ({ file, disabled, onFile }: DropZoneProps) => {
+const DropZone = ({ file, disabled, onFile, maxClipLabel, onDuration }: DropZoneProps) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
   const [meta, setMeta] = useState<{ durationMs: number; width: number; height: number } | null>(null);
 
   useEffect(() => {
+    onDuration?.(null);
     if (!file) {
       setPreview(null);
       setMeta(null);
@@ -42,6 +47,7 @@ const DropZone = ({ file, disabled, onFile }: DropZoneProps) => {
           onLoadedMetadata={(event) => {
             const video = event.currentTarget;
             setMeta({ durationMs: video.duration * 1000, width: video.videoWidth, height: video.videoHeight });
+            if (Number.isFinite(video.duration)) onDuration?.(video.duration * 1000);
           }}
         />
         <div className="flex items-center gap-3 p-3">
@@ -88,7 +94,7 @@ const DropZone = ({ file, disabled, onFile }: DropZoneProps) => {
       <Upload className="size-5 text-ink-faint" strokeWidth={1.75} />
       <div>
         <p className="text-sm font-medium">Drop a video here, or click to browse</p>
-        <p className="mt-1 text-xs text-ink-faint">MP4, MOV, MKV, WebM · up to 4 GB</p>
+        <p className="mt-1 text-xs text-ink-faint">MP4, MOV, MKV, WebM · {maxClipLabel ? `clips up to ${maxClipLabel} on your plan` : "up to 4 GB"}</p>
       </div>
       <input
         ref={inputRef}

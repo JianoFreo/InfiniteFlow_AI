@@ -64,8 +64,21 @@ services:
       INTERNAL_KEY: ${INTERNAL_KEY:-change-me-too}
       # How many chunks the Python engine processes at the same time. Raise it on a bigger machine.
       ENGINE_THREADS: "2"
-      MAX_ACTIVE_GUEST_JOBS: "1"
-      MAX_ACTIVE_USER_JOBS: "5"
+      # Usage limits per plan (source-video seconds per rolling 24 h, longest clip, highest factor, at once).
+      # Defaults: guest 30 s / 10 s / 2x / 1, free 180 s / 30 s / 4x / 2, pro 1800 s / 180 s / 8x / 5.
+      # Override any of them in infra/.env, e.g. PLAN_GUEST_DAILY_SECONDS=60
+      PLAN_GUEST_DAILY_SECONDS: ${PLAN_GUEST_DAILY_SECONDS:-30}
+      PLAN_GUEST_MAX_CLIP_SECONDS: ${PLAN_GUEST_MAX_CLIP_SECONDS:-10}
+      PLAN_GUEST_MAX_FACTOR: ${PLAN_GUEST_MAX_FACTOR:-2}
+      PLAN_GUEST_MAX_ACTIVE: ${PLAN_GUEST_MAX_ACTIVE:-1}
+      PLAN_FREE_DAILY_SECONDS: ${PLAN_FREE_DAILY_SECONDS:-180}
+      PLAN_FREE_MAX_CLIP_SECONDS: ${PLAN_FREE_MAX_CLIP_SECONDS:-30}
+      PLAN_FREE_MAX_FACTOR: ${PLAN_FREE_MAX_FACTOR:-4}
+      PLAN_FREE_MAX_ACTIVE: ${PLAN_FREE_MAX_ACTIVE:-2}
+      PLAN_PRO_DAILY_SECONDS: ${PLAN_PRO_DAILY_SECONDS:-1800}
+      PLAN_PRO_MAX_CLIP_SECONDS: ${PLAN_PRO_MAX_CLIP_SECONDS:-180}
+      PLAN_PRO_MAX_FACTOR: ${PLAN_PRO_MAX_FACTOR:-8}
+      PLAN_PRO_MAX_ACTIVE: ${PLAN_PRO_MAX_ACTIVE:-5}
       # Read by the Python engine (inherited by the child process)
       FLOW_PRESET: medium
       FLOW_MAX_SIDE: "640"
@@ -93,6 +106,12 @@ services:
       INTERNAL_KEY: ${INTERNAL_KEY:-change-me-too}
       AUTH_SECRET: ${AUTH_SECRET:-change-me-before-going-public}
       CORS_ORIGIN: http://localhost:8080,http://localhost:5173
+      # Stripe (optional). Empty = billing off, everyone is guest or free. Use test-mode keys locally.
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      STRIPE_PRICE_PRO: ${STRIPE_PRICE_PRO:-}
+      PRO_PRICE_LABEL: ${PRO_PRICE_LABEL:-$$9 / month}
+      APP_URL: ${APP_URL:-http://localhost:8080}
     ports:
       - "5000:5000" # exposed so `npm run dev` in frontend/ can use it too
     depends_on:

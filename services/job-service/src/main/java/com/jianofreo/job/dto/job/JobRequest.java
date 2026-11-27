@@ -34,4 +34,12 @@ public class JobRequest {
     @NotBlank
     @Size(max = 64)
     private String ownerId;
+
+    /** Set by the BFF: a hash of the caller's IP, so a guest can't reset the daily limit by clearing the browser. */
+    @Size(max = 64)
+    private String clientKey;
+
+    public JobRequest(Integer sourceMediaId, Integer factor, String mode, String preprocess, String ownerId) {
+        this(sourceMediaId, factor, mode, preprocess, ownerId, null);
+    }
 }

@@ -1,5 +1,6 @@
 package com.jianofreo.job.service;
 
+import com.jianofreo.job.dto.auth.BillingRequest;
 import com.jianofreo.job.dto.auth.LoginRequest;
 import com.jianofreo.job.dto.auth.RegisterRequest;
 import com.jianofreo.job.dto.auth.UserResponse;
@@ -48,11 +49,27 @@ public class AuthService {
                 .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "Account not found"));
     }
 
+    /** The Stripe webhook (through the BFF) reports the subscription's current state. Idempotent: it just overwrites. */
+    public UserResponse updateBilling(Integer id, BillingRequest request) {
+        User user = userRepository.findById(id).orElseThrow(() -> ApiException.notFound("Account " + id + " not found"));
+        if (request.getStripeCustomerId() != null) {
+            user.setStripeCustomerId(request.getStripeCustomerId());
+        }
+        user.setStripeSubscriptionId(request.getStripeSubscriptionId());
+        user.setSubscriptionStatus(request.getStatus());
+        user.setPlan(request.getPlan());
+        user.setPlanRenewsAt(request.getRenewsAt());
+        User saved = userRepository.save(user);
+        log.info("user_billing id={} plan={} status={}", id, saved.getPlan(), saved.getSubscriptionStatus());
+        return toResponse(saved);
+    }
+
     private static String normalize(String email) {
         return email.trim().toLowerCase(Locale.ROOT);
     }
 
     private static UserResponse toResponse(User user) {
-        return new UserResponse(user.getId(), user.getEmail(), user.getName());
+        return new UserResponse(user.getId(), user.getEmail(), user.getName(),
+                QuotaService.planOf(user).key(), user.getStripeCustomerId());
     }
 }
