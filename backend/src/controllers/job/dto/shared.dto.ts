@@ -115,4 +115,6 @@ export interface JobDetailView extends JobView {
 
 export interface ErrorResponse {
   message: string;
+  /** Set for plan limits: "too_many_running" | "plan_limit" | "quota_exceeded". The frontend offers an upgrade. */
+  code?: string;
 }

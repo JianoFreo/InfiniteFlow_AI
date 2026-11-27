@@ -11,9 +11,10 @@ export const forwardServiceError = (err: unknown, res: Response, fallback: strin
   if (isAxiosError(err)) {
     if (err.response) {
       const status = err.response.status;
-      const data = err.response.data as { message?: string } | undefined;
+      const data = err.response.data as { message?: string; code?: string } | undefined;
       const message = typeof data?.message === "string" ? data.message : fallback;
-      return res.status(status >= 500 ? 502 : status).json({ message });
+      const code = status < 500 && typeof data?.code === "string" ? data.code : undefined;
+      return res.status(status >= 500 ? 502 : status).json(code ? { message, code } : { message });
     }
     const service = err.config?.baseURL ?? "a service";
     console.error(`[bff] ${fallback}: ${service} unreachable (${err.code ?? err.message})`);
